@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 面試分析儀表板</title>
+    <style>
+        /* 深色科技感變數 (已弱化發光效果) */
+        :root {
+            --bg-page: #0a0a0f;
+            /* 稍微調深，不再依賴背景光 */
+            --bg-card: rgba(20, 25, 35, 0.9);
+            /* 提高不透明度，減少玻璃反光感 */
+            --bg-panel: rgba(255, 255, 255, 0.05);
+            --border: rgba(14, 165, 233, 0.3);
+            /* 邊框稍微明顯一點，彌補無陰影 */
+            --border-light: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #8ba3cb;
+            --accent: #0ea5e9;
+            --accent-glow: transparent;
+            /* 🔥 關閉全域發光 */
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            /* 🔥 移除背景的大圓形光暈 */
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* ============== 側邊欄與導航 ============== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: #0f141e;
+            /* 移除透明度與玻璃感 */
+            border-right: 1px solid var(--border-light);
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            /* 🔥 移除側邊欄大陰影 */
+            z-index: 200;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            /* 捨棄 blur 濾鏡，改用純色半透明 */
+            z-index: 150;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #sidebarToggle:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(-100%);
+            }
+
+            .sidebar:not(.collapsed) {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+        }
+
+        .menu-item {
+            padding: 14px 16px;
+            border-radius: 8px;
+            /* 稍微調小圓角 */
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover {
+            background: rgba(14, 165, 233, 0.1);
+            color: white;
+        }
+
+        .menu-item.active {
+            background: rgba(14, 165, 233, 0.2);
+            color: var(--accent);
+            border-left: 4px solid var(--accent);
+            border-top-left-radius: 0;
+            /* 左側貼齊邊緣 */
+            border-bottom-left-radius: 0;
+        }
+
+        /* ============== 主內容區 ============== */
+        .main-content {
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-left: 260px;
+            width: calc(100% - 260px);
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar.collapsed~.main-content {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1024px;
+            padding: 0 24px 80px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            width: 100%;
+            max-width: 100%;
+            padding: 20px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            background: #0f141e;
+            /* 移除 Header 玻璃模糊，改純色 */
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: #fff;
+            /* 🔥 移除漸層字體，改純白 */
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            /* 🔥 移除 Icon 陰影 */
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .view-section {
+            display: none;
+            animation: fadeInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        @keyframes fadeInRight {
+            from {
+                opacity: 0;
+                transform: translateX(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* 成長趨勢圖 */
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            /* 弱化邊框顏色 */
+            border-radius: 12px;
+            /* 統一圓角大小 */
+            padding: 24px;
+            margin-bottom: 32px;
+            /* 🔥 移除大陰影與模糊背景 */
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        canvas#trendChart {
+            width: 100%;
+            height: 200px;
+        }
+
+        /* 卡片網格 */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card:hover {
+            border-color: var(--accent);
+            background: rgba(14, 165, 233, 0.08);
+            transform: translateY(-2px);
+            /* 減小浮動幅度 */
+            /* 🔥 移除 Hover 時的發光陰影 */
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .card-role {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .card-date {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .card-score {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent);
+            /* 🔥 移除分數文字陰影 */
+        }
+
+        .card-feedback {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* 視圖 2：詳細報告 */
+        .btn-back {
+            background: transparent;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            margin-bottom: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-back:hover {
+            background: var(--bg-panel);
+            color: var(--text-main);
+            border-color: var(--accent);
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .report-title-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .report-total-score {
+            text-align: right;
+        }
+
+        .score-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+        }
+
+        .score-number {
+            font-size: 48px;
+            font-weight: 800;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 24px;
+            /* 🔥 移除陰影 */
+        }
+
+        .metric-title {
+            font-size: 16px;
+            color: var(--accent);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .skill-row {
+            margin-bottom: 16px;
+        }
+
+        .skill-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .skill-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .skill-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            /* 🔥 移除進度條發光效果 */
+            transition: width 1s ease-out;
+        }
+
+        .feedback-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .feedback-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .feedback-panel.good {
+            border-top: 3px solid var(--success);
+        }
+
+        .feedback-panel.bad {
+            border-top: 3px solid var(--warning);
+        }
+
+        .feedback-list {
+            margin: 0;
+            padding-left: 20px;
+            color: var(--text-muted);
+            line-height: 1.8;
+            font-size: 15px;
+        }
+
+        .feedback-list li {
+            margin-bottom: 8px;
+        }
+
+        .transcript-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            overflow: hidden;
+        }
+
+        .transcript-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-light);
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .transcript-body {
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        .msg-block {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 80%;
+        }
+
+        .msg-block.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .msg-block.ai {
+            align-self: flex-start;
+        }
+
+        .msg-sender {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .msg-text {
+            font-size: 15px;
+            line-height: 1.6;
+            padding: 14px 18px;
+        }
+
+        .msg-block.user .msg-text {
+            background: rgba(14, 165, 233, 0.15);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 18px 18px 4px 18px;
+            color: var(--text-main);
+            /* 🔥 移除對話氣泡陰影 */
+        }
+
+        .msg-block.ai .msg-text {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 18px 18px 18px 4px;
+            color: var(--text-main);
+        }
+
+        .transcript-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transcript-body::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 10px;
+        }
+
+        .btn-resume {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            margin-top: 12px;
+            transition: all 0.2s ease;
+            width: fit-content;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-resume.active {
+            background: rgba(14, 165, 233, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(14, 165, 233, 0.4);
+            cursor: pointer;
+        }
+
+        .btn-resume.active:hover {
+            background: rgba(14, 165, 233, 0.2);
+            border-color: var(--accent);
+            /* 🔥 移除發光效果，僅微調位移 */
+            transform: translateY(-2px);
+        }
+
+        .btn-resume.disabled {
+            background: transparent;
+            color: rgba(139, 163, 203, 0.4);
+            border: 1px dashed rgba(139, 163, 203, 0.2);
+            cursor: not-allowed;
+            user-select: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-layout">
+
+        <div id="sidebarOverlay" class="sidebar-overlay hidden" onclick="toggleSidebar()"></div>
+
+        <div class="sidebar collapsed">
+            <div class="sidebar-title" style="color:white; font-size:18px; font-weight:bold; margin-bottom: 20px;">
+                AI 面試生態系
+            </div>
+
+            <div class="menu-item" onclick="window.location.href='index.html'">
+                模擬面試系統
+            </div>
+
+            <div class="menu-item" onclick="window.location.href='index.html?feature=jd'">
+                履歷與職缺診斷
+            </div>
+
+            <div id="menu-dashboard" class="menu-item active" onclick="switchFeature('dashboard')">
+                面試數據儀表板
+            </div>
+            <div class="menu-item" onclick="logout()">
+                登出
+            </div>
+        </div>
+
+        <div class="main-content">
+
+            <header
+                style="position: sticky; top: 0; z-index: 50; background: rgba(15, 20, 30, 0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button id="sidebarToggle" onclick="toggleSidebar()"
+                        style="background: transparent; border: none; color: var(--text-main); font-size: 24px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background 0.2s;">
+                        ☰
+                    </button>
+                    <div class="logo" style="margin: 0;">
+                        <div class="logo-icon">I</div>
+                        Interview Pro
+                    </div>
+                </div>
+
+
+            </header>
+            <div class="container" style="flex: 1; width: 100%; box-sizing: border-box;">
+                <section id="dashboardView" class="view-section active">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                        <h1 class="header-title" style="margin-bottom: 0;">AI 面試分析儀表板</h1>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-title">歷史面試成長趨勢</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">近 4 次紀錄</div>
+                        </div>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+
+                    <div class="grid-layout" id="cardsGrid">
+                    </div>
+                </section>
+
+                <section id="detailView" class="view-section">
+                    <button class="btn-back" onclick="showDashboard()">
+                        ← 返回儀表板
+                    </button>
+
+                    <div class="report-header">
+                        <div class="report-title-wrapper">
+                            <h1 class="header-title" id="detailRole" style="margin:0;">載入中...</h1>
+                            <div style="color: var(--text-muted); font-family: monospace;" id="detailDate"></div>
+                        </div>
+                        <div class="report-total-score">
+                            <div class="score-label">TOTAL SCORE</div>
+                            <div class="score-number" id="detailScore">0</div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-title">核心能力雷達解析</div>
+                            <div id="skillsContainer">
+                            </div>
+                        </div>
+
+                        <div class="metric-card"
+                            style="display: flex; flex-direction: column; justify-content: center;">
+                            <div class="metric-title">系統綜合短評</div>
+                            <p id="detailFeedback"
+                                style="font-size: 18px; line-height: 1.6; color: var(--text-main); margin: 0;"></p>
+                        </div>
+                    </div>
+
+                    <div class="feedback-grid">
+                        <div class="feedback-panel good">
+                            <div class="metric-title" style="color: var(--success);">表現亮點</div>
+                            <ul class="feedback-list" id="strengthsList"></ul>
+                        </div>
+                        <div class="feedback-panel bad">
+                            <div class="metric-title" style="color: var(--warning);">待改進建議</div>
+                            <ul class="feedback-list" id="improvementsList"></ul>
+                        </div>
+                    </div>
+
+                    <div class="transcript-container">
+                        <div class="transcript-header">完整面試逐字稿</div>
+                        <div class="transcript-body" id="transcriptBody">
+                        </div>
+                    </div>
+
+                    <div id="growthZone"
+                        style="margin-top: 32px; padding: 24px; background: rgba(14, 165, 233, 0.05); border: 1px solid var(--border); border-radius: 16px; display: none;">
+                    </div>
+                </section>
+
+            </div>
+
+            <script>
+                const API_BASE_URL = "http://localhost:8000/api/interview";
+                let realData = [];
+
+                // 1. 初始化引擎
+                window.onload = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/history`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            // 後端傳來的預設已經是「最新 -> 最舊」
+                            realData = data.records || [];
+                        }
+                    } catch (err) {
+                        console.error("API 連線失敗:", err);
+                    }
+
+                    if (realData.length > 0) {
+                        renderCards();
+                        drawTrendChart();
+                    } else {
+                        document.getElementById("cardsGrid").innerHTML = `
+                <p style="color:var(--text-muted); text-align:center; padding:40px; border:1px dashed var(--border-light); grid-column: 1 / -1;">
+                    尚無面試紀錄，前往進行模擬面試吧！
+                </p>`;
+                    }
+                };
+
+                function toggleSidebar() {
+                    const sidebar = document.querySelector('.sidebar');
+                    const overlay = document.getElementById('sidebarOverlay');
+
+                    if (!sidebar) return;
+
+                    sidebar.classList.toggle('collapsed');
+                    const isOpen = !sidebar.classList.contains('collapsed');
+                    if (overlay) overlay.classList.toggle('hidden', !isOpen);
+                }
+
+                // ==========================================
+                // 智慧區塊切換與路由邏輯 (支援跨網頁共用)
+                // ==========================================
+                function switchFeature(featureName) {
+
+                    // 判斷目前是否在 dashboard.html
+                    const isDashboardPage = window.location.pathname.includes('dashboard.html');
+
+                    // ===============================
+                    // 跨頁切換
+                    // ===============================
+                    if (isDashboardPage) {
+                        // Dashboard → 回主頁 (加上參數，讓首頁知道要打開哪個功能)
+                        if (featureName === 'interview' || featureName === 'jd') {
+                            window.location.href = 'index.html?feature=' + featureName;
+                            return;
+                        }
+                    } else {
+                        // 主頁 → Dashboard
+                        if (featureName === 'dashboard') {
+                            window.location.href = 'dashboard.html';
+                            return;
+                        }
+                    }
+
+                    // ===============================
+                    // 內部切換與亮燈邏輯
+                    // ===============================
+
+                    // 🔥 1. 把 dashboardMenu 也抓進來
+                    const jdMenu = document.getElementById('menu-jd');
+                    const interviewMenu = document.getElementById('menu-interview');
+                    const dashboardMenu = document.getElementById('menu-dashboard');
+
+                    const viewJd = document.getElementById('view-jd');
+                    const viewInterview = document.getElementById('view-interview');
+
+                    // 🔥 2. 清除所有選單狀態 (包含 dashboard)
+                    if (jdMenu) jdMenu.classList.remove('active');
+                    if (interviewMenu) interviewMenu.classList.remove('active');
+                    if (dashboardMenu) dashboardMenu.classList.remove('active');
+
+                    // 隱藏頁面
+                    if (viewJd) viewJd.classList.remove('active');
+                    if (viewInterview) viewInterview.classList.remove('active');
+
+                    // 隱藏面試報告
+                    const reportCard = document.getElementById('reportCard');
+                    if (reportCard) {
+                        reportCard.classList.remove('active');
+                        reportCard.style.display = 'none';
+                    }
+
+                    // 🔥 3. 顯示指定頁面，並把對應的按鈕點亮
+                    if (featureName === 'jd') {
+                        if (jdMenu) jdMenu.classList.add('active');
+                        if (viewJd) viewJd.classList.add('active');
+                    } else if (featureName === 'interview') {
+                        if (interviewMenu) interviewMenu.classList.add('active');
+                        if (viewInterview) viewInterview.classList.add('active');
+                    } else if (featureName === 'dashboard') {
+                        // 如果是在 dashboard.html 點擊自己，確保它會重新亮起來！
+                        if (dashboardMenu) dashboardMenu.classList.add('active');
+                    }
+
+                    // 手機版自動收起側欄
+                    if (window.innerWidth <= 768) {
+                        const sidebar = document.querySelector('.sidebar');
+                        const overlay = document.getElementById('sidebarOverlay');
+
+                        if (sidebar && !sidebar.classList.contains('collapsed')) {
+                            sidebar.classList.add('collapsed');
+                        }
+
+                        if (overlay && !overlay.classList.contains('hidden')) {
+                            overlay.classList.add('hidden');
+                        }
+                    }
+                }
+
+                // 2. 渲染歷史卡片
+                function renderCards() {
+                    const grid = document.getElementById("cardsGrid");
+
+                    // realData 已經是最新的在前面，直接渲染
+                    grid.innerHTML = realData.map(item => `
+            <div class="card" onclick="showDetail(${item.id})">
+                <div class="card-header">
+                    <div class="card-role">${item.role || '未定職位'}</div>
+                    <div class="card-date">${item.date || '未知時間'}</div>
+                </div>
+                <div class="card-score">${item.totalScore || 0} <span style="font-size:14px; color:#8ba3cb;">/ 100</span></div>
+                <div class="card-feedback" style="overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">
+                    ${item.shortFeedback || '無評語'}
+                </div>
+            </div>
+        `).join("");
+                }
+
+                // 3. 繪製趨勢折線圖 (已修正為：左邊最舊，右邊最新)
+                function drawTrendChart() {
+                    if (realData.length < 2) return;
+
+                    const canvas = document.getElementById("trendChart");
+                    const ctx = canvas.getContext("2d");
+                    const dpr = window.devicePixelRatio || 1;
+                    const width = canvas.clientWidth, height = canvas.clientHeight, pad = 30;
+
+                    canvas.width = width * dpr;
+                    canvas.height = height * dpr;
+                    ctx.scale(dpr, dpr);
+
+                    // 🔥 修復排序邏輯：
+                    // 1. 先從 realData 抓出最近的 4 筆 (因為 realData 本來就是最新到最舊，所以取 slice(0, 4))
+                    // 2. 將這 4 筆反轉 (reverse)，變成「舊 -> 新」，這樣畫出來的時間軸才正確！
+                    const chartData = realData.slice(0, 4).reverse();
+
+                    const scores = chartData.map(d => d.totalScore || 0);
+                    const labels = chartData.map(d => {
+                        const parts = d.date.split('-');
+                        return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : d.date;
+                    });
+
+                    const minVal = Math.max(0, Math.min(...scores) - 10);
+                    const maxVal = Math.min(100, Math.max(...scores) + 10);
+
+                    const getXY = (val, i) => ({
+                        x: pad + (i / (scores.length - 1)) * (width - pad * 2),
+                        y: height - pad - ((val - minVal) / (maxVal - minVal)) * (height - pad * 2)
+                    });
+
+                    ctx.clearRect(0, 0, width, height);
+
+                    // 畫格線與 Y 軸標籤 (可選，讓圖表更有參考價值)
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+                    ctx.fillStyle = "#8ba3cb";
+                    ctx.font = "12px monospace";
+                    ctx.textAlign = "right";
+                    for (let i = minVal; i <= maxVal; i += 10) {
+                        const y = height - pad - ((i - minVal) / (maxVal - minVal)) * (height - pad * 2);
+                        ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(width - pad, y); ctx.stroke();
+                        ctx.fillText(i, pad - 10, y + 4);
+                    }
+
+                    // 畫折線
+                    ctx.beginPath();
+                    ctx.strokeStyle = "#0ea5e9";
+                    ctx.lineWidth = 3;
+                    const pts = scores.map((s, i) => getXY(s, i));
+                    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+                    ctx.stroke();
+
+                    // 畫點與 X 軸標籤 (日期)
+                    ctx.textAlign = "center";
+                    pts.forEach((p, i) => {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                        ctx.fillStyle = "#05050a"; ctx.fill();
+                        ctx.lineWidth = 2; ctx.strokeStyle = "#0ea5e9"; ctx.stroke();
+
+                        ctx.fillStyle = "#8ba3cb";
+                        ctx.fillText(labels[i], p.x, height - 5);
+                    });
+                }
+
+                // 4. 🔥 修復：切換進入詳細資料畫面
+                // 4. 🔥 切換進入詳細資料畫面
+                window.showDetail = function (id, options = {}) {
+                    const { updateHistory = true } = options;
+                    // 從全域資料中找出被點擊的那筆紀錄
+                    const record = realData.find(item => item.id === id);
+                    if (!record) return;
+                    console.log("當前點擊的面試紀錄：", record);
+                    // 隱藏儀表板，顯示詳細畫面
+                    if (updateHistory) {
+                        history.pushState({ view: 'detail', id }, '', `dashboard.html?record=${id}`);
+                    }
+
+                    document.getElementById("dashboardView").classList.remove("active");
+                    document.getElementById("detailView").classList.add("active");
+
+                    // --- 🔥 新增履歷下載按鈕邏輯 ---
+                    let resumeBtnHtml = '';
+                    if (record.resumeUrl) {
+                        // 有履歷：顯示發光的科技感按鈕
+                        resumeBtnHtml = `<button onclick="window.open('${record.resumeUrl}', '_blank')" class="btn-resume active">查看面試履歷</button>`;
+                    } else {
+                        // 無履歷：顯示淡淡的提示文字
+                        resumeBtnHtml = `<div class="btn-resume disabled">未上傳履歷</div>`;
+                    }
+
+                    // 填入詳細標題與分數
+                    document.getElementById("detailRole").innerText = record.role || "未定職位";
+                    document.getElementById("detailDate").innerText = record.date;
+                    document.getElementById("detailScore").innerText = record.totalScore;
+
+                    // 填入綜合評語
+                    document.getElementById("detailFeedback").innerText = record.shortFeedback;
+
+                    // 🔥 把按鈕加在「標題區塊」或「評語區塊」的某個合適位置
+                    // 假設你的 HTML 中有一個 <div id="detailHeaderArea">，或者我們直接把它接在 Role 後面：
+                    const roleElement = document.getElementById("detailRole");
+
+                    // 先清除之前可能加過的按鈕，避免重複 (注意：這裡要改成抓 .btn-resume)
+                    const existingBtn = roleElement.parentNode.querySelector('.btn-resume');
+                    if (existingBtn) existingBtn.remove();
+
+                    // 🔥 關鍵修正：把外面的 if(record.resumeUrl) 刪掉！
+                    // 無論是有履歷還是沒履歷，都把我們設定好的 resumeBtnHtml 塞進畫面裡！
+                    roleElement.parentNode.insertAdjacentHTML('beforeend', resumeBtnHtml);
+
+                    // 填入能力長條圖
+                    const skillsContainer = document.getElementById("skillsContainer");
+                    skillsContainer.innerHTML = "";
+                    if (record.detailedScores) {
+                        for (const [skill, score] of Object.entries(record.detailedScores)) {
+                            skillsContainer.innerHTML += `
+                    <div class="skill-row" style="margin-bottom: 12px;">
+                        <div class="skill-header" style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:4px;">
+                            <span>${skill}</span>
+                            <span style="color:var(--accent); font-family:monospace;">${score}%</span>
+                        </div>
+                        <div class="skill-bar-bg" style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+                            <div class="skill-bar-fill" style="width: ${score}%; height:100%; background:var(--accent); border-radius:4px; transition: width 1s ease-out;"></div>
+                        </div>
+                    </div>
+                `;
+                        }
+                    }
+
+                    // 填入優缺點列表
+                    document.getElementById("strengthsList").innerHTML = (record.strengths || []).map(s => `<li>${s}</li>`).join("");
+                    document.getElementById("improvementsList").innerHTML = (record.improvements || []).map(i => `<li>${i}</li>`).join("");
+
+                    // 填入逐字稿對話 (注意：後端存的是 content，不是 text)
+                    const transcriptBody = document.getElementById("transcriptBody");
+                    transcriptBody.innerHTML = (record.transcript || []).map(msg => `
+            <div class="msg-block ${msg.role}" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; background: ${msg.role === 'ai' ? 'rgba(255,255,255,0.05)' : 'rgba(14,165,233,0.1)'};">
+                <div class="msg-sender" style="font-size:12px; color:var(--text-muted); margin-bottom:4px; font-weight:bold;">${msg.role === 'ai' ? 'SYSTEM (AI)' : 'YOU'}</div>
+                <div class="msg-text" style="font-size:14px; line-height:1.5;">${msg.content}</div>
+            </div>
+        `).join("");
+
+                    if (typeof triggerGrowthZoneHook === 'function') {
+                        triggerGrowthZoneHook({
+                            role: record.role,
+                            totalScore: record.totalScore,
+                            shortFeedback: record.shortFeedback,
+                            improvements: record.improvements,
+                            transcript: record.transcript
+                        });
+                    }
+                };
+
+                // 5. 🔥 修復：從詳細資料畫面返回儀表板
+                window.showDashboard = function (options = {}) {
+                    const { updateHistory = true } = options;
+                    document.getElementById("detailView").classList.remove("active");
+                    document.getElementById("dashboardView").classList.add("active");
+
+                    if (updateHistory) {
+                        history.pushState({ view: 'dashboard' }, '', 'dashboard.html');
+                    }
+                };
+
+                window.addEventListener('popstate', () => {
+                    const params = new URLSearchParams(window.location.search);
+                    const recordId = Number(params.get('record'));
+
+                    if (recordId) {
+                        showDetail(recordId, { updateHistory: false });
+                    } else {
+                        showDashboard({ updateHistory: false });
+                    }
+                });
+
+                // 當快閃實戰結束，打完 /api/growth/evaluate_drill 拿到資料後執行
+                function renderDrillResult(data) {
+                    const growthZone = document.getElementById('growthZone');
+
+                    const deltaColor = data.delta > 0 ? "var(--success)" : "var(--warning)";
+                    const deltaSign = data.delta > 0 ? "+" : "";
+
+                    growthZone.innerHTML = `
+        <h3 style="color: var(--accent); margin-top: 0; margin-bottom: 16px;">🏆 實戰驗收結果</h3>
+        
+        <div style="display: flex; align-items: center; justify-content: center; gap: 40px; background: var(--bg-card); padding: 32px; border-radius: 16px; border: 1px solid var(--border-light); margin-bottom: 24px;">
+            <div style="text-align: center;">
+                <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">初次表現</div>
+                <div style="font-size: 32px; font-weight: bold; color: var(--text-muted); opacity: 0.7;">65</div>
+            </div>
+            
+            <div style="text-align: center;">
+                <div style="font-size: 24px; color: ${deltaColor}; margin-bottom: 4px;">➔</div>
+                <div style="font-size: 18px; font-weight: bold; color: ${deltaColor}; background: rgba(16, 185, 129, 0.1); padding: 4px 12px; border-radius: 20px;">
+                    ${deltaSign}${data.delta} 分
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <div style="font-size: 14px; color: var(--accent); font-weight: bold; margin-bottom: 8px;">實戰後表現</div>
+                <div style="font-size: 48px; font-weight: 900; color: white; text-shadow: 0 0 20px ${deltaColor};">${data.new_score}</div>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent);">
+            <div style="font-weight: bold; margin-bottom: 8px;">👨‍🏫 教練總結</div>
+            <div style="color: var(--text-main); line-height: 1.6;">${data.coach_comment}</div>
+        </div>
+    `;
+                }
+            </script>
+            <script>
+                const API_BASE = "http://localhost:8000/api";
+                const GrowthState = { jobTitle: "", weaknessCode: "", worstAnswer: "", originalScore: 0, drillChatHistory: [], roundCount: 0 };
+            </script>
+            <script src="growth-v2.js"></script>
+</body>
+
+</html>

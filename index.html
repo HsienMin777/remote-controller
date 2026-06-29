@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 面試模擬終端</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <link rel="stylesheet" href="dashboard-style.css">
+
+    <style>
+        :root {
+            --bg-page: #05050a;
+            --bg-card: rgba(15, 20, 30, 0.6);
+            --bg-input: rgba(255, 255, 255, 0.03);
+            --border: rgba(14, 165, 233, 0.2);
+            --text-main: #f8fafc;
+            --text-muted: #8ba3cb;
+            --accent: #5dccff;
+            --accent-hover: #73d0ff;
+            --accent-glow: rgba(14, 165, 233, 0.4);
+            --radius-lg: 24px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-page);
+            background-image: radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.15) 0%, transparent 50%);
+            background-repeat: no-repeat;
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+
+            /* 確保整個網頁是滿版且不能滾動的容器 */
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ============== 側邊欄與導航 ============== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: rgba(15, 20, 30, 0.98);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+            z-index: 200;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 150;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #sidebarToggle:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(0);
+            }
+
+            .sidebar.collapsed {
+                width: 260px;
+                transform: translateX(-100%);
+                padding: 32px 20px;
+            }
+        }
+
+        .menu-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover {
+            background: rgba(14, 165, 233, 0.1);
+            color: white;
+        }
+
+        .menu-item.active {
+            background: rgba(14, 165, 233, 0.2);
+            color: var(--accent);
+            border-left: 4px solid var(--accent);
+            border-top-left-radius: 4px;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* ============== 主內容區 ============== */
+        .main-content {
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1024px;
+            padding: 0 24px 80px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .view-section {
+            display: none;
+            animation: fadeInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        @keyframes fadeInRight {
+            from {
+                opacity: 0;
+                transform: translateX(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        header {
+            width: 100%;
+            max-width: 100%;
+            padding: 32px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 10px var(--accent-glow);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .hero {
+            margin: 10px 0 24px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 0 0 16px 0;
+            line-height: 1.1;
+            background: linear-gradient(135deg, #ffffff 0%, #7dd3fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin: 0;
+            font-weight: 400;
+            letter-spacing: 0.05em;
+        }
+
+        /* 1. 找到滑出來的選單內容區塊 */
+        .custom-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            background: #0f141e;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+
+            /* 🔥 關鍵修正 1：給選單一個萬能圖層金牌，數字越大代表越在威風的最上層！ */
+            z-index: 9999;
+
+            display: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+        }
+
+        .setup-card {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            transition: all 0.5s ease-in-out;
+            opacity: 1;
+            height: auto;
+            overflow: visible;
+            margin-bottom: 24px;
+
+            /* 🔥 關鍵修正 2：為了讓裡面的絕對定位選單能順利壓過下方的 .canvas-card，
+       我們必須賦予這張卡片定位與基礎圖層高度！ */
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 客製化下拉選單 */
+        .custom-select-trigger {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .custom-select-trigger:hover,
+        .custom-select-trigger.open {
+            border-color: var(--accent);
+            background: rgba(14, 165, 233, 0.1);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
+        }
+
+        .custom-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            background: #0f141e;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+        }
+
+        .custom-options.show {
+            display: block;
+            animation: fadeInDown 0.2s ease-out forwards;
+        }
+
+        .custom-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+        }
+
+        .custom-option:hover {
+            background: rgba(14, 165, 233, 0.15);
+            color: var(--text-main);
+        }
+
+        .custom-option.selected {
+            background: rgba(14, 165, 233, 0.2);
+            color: var(--accent);
+            font-weight: 600;
+            border-left: 3px solid var(--accent);
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .input-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .input-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            padding-left: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 16px 20px;
+            background: var(--bg-input);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            color: var(--text-main);
+            font-weight: 500;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .input-field::placeholder {
+            color: #475569;
+            font-weight: 400;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(14, 165, 233, 0.05);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        /* ============== 面試對話畫布 ============== */
+        .canvas-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 24px;
+
+        }
+
+        .dialogue-box {
+            /* ❌ 刪除這行： height: 550px; */
+
+            /* 🔥 加上這三行，讓它具有「彈性生長」的超能力： */
+            height: auto;
+            /* 讓高度根據內容多寡自然變化 */
+            min-height: 80px;
+            /* 給一個最小高度，讓第一句話有空間 */
+            max-height: 550px;
+            /* 設定生長極限！超過這個高度才出現捲軸 */
+
+            padding: 40px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scroll-behavior: smooth;
+        }
+
+        .dialogue-box::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+
+        .msg-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 75%;
+        }
+
+        .msg-block.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .msg-block.ai {
+            align-self: flex-start;
+        }
+
+        .msg-sender {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-family: monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .user-text {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(14, 165, 233, 0.05) 100%);
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            padding: 16px 22px;
+            border-radius: 20px 20px 6px 20px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+        }
+
+        .ai-text {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 16px 22px;
+            border-radius: 20px 20px 20px 6px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-main);
+        }
+
+        .system-text {
+            align-self: center;
+            font-size: 13px;
+            color: var(--accent);
+            font-family: monospace;
+            background: rgba(14, 165, 233, 0.1);
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+
+        .action-area {
+            padding: 32px 40px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .visualizer-container {
+            width: 100%;
+            height: 64px;
+            border-radius: var(--radius-md);
+            display: none;
+            align-items: center;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #visualizer {
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: center;
+
+            /* 🔥 新增下面這行： */
+            /* margin: 上 左右 下; 讓按鈕與對話保持距離，且置中對齊 */
+            margin: 24px auto 24px auto;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 18px 36px;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            border-radius: 100px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-start {
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .btn-start:hover {
+            background-color: #38bdf8;
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
+        }
+
+        .btn-stop {
+            background-color: transparent;
+            color: #f87171;
+            border: 1px solid #f87171;
+            display: none;
+        }
+
+        .btn-stop:hover {
+            background-color: rgba(248, 113, 113, 0.1);
+            box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
+        }
+
+        .status {
+            font-size: 14px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #475569;
+        }
+
+        .status-dot.active {
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        /* 上傳區域 & 切換按鈕 */
+        .upload-zone {
+            width: 100%;
+            padding: 32px 20px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-md);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .toggle-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: rgba(14, 165, 233, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        button:disabled,
+        #mainBtn:disabled {
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: rgba(255, 255, 255, 0.2) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: none !important;
+            cursor: not-allowed !important;
+            transform: none !important;
+        }
+
+        /* 為了配合 CSS 共用，這裡替報告卡片加上 dashboard 的基礎樣式 */
+        #reportCard {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            margin-top: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            color: var(--text-main);
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .report-title-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .report-total-score {
+            text-align: right;
+        }
+
+        .score-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+        }
+
+        .score-number {
+            font-size: 48px;
+            font-weight: 800;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .metric-title {
+            font-size: 16px;
+            color: var(--accent);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .skill-row {
+            margin-bottom: 16px;
+        }
+
+        .skill-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .skill-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .skill-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+            transition: width 1s ease-out;
+        }
+
+        .feedback-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .feedback-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .feedback-panel.good {
+            border-top: 3px solid var(--success);
+        }
+
+        .feedback-panel.bad {
+            border-top: 3px solid var(--warning);
+        }
+
+        .feedback-list {
+            margin: 0;
+            padding-left: 20px;
+            color: var(--text-muted);
+            line-height: 1.8;
+            font-size: 15px;
+        }
+
+        .feedback-list li {
+            margin-bottom: 8px;
+        }
+
+        .transcript-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            overflow: hidden;
+        }
+
+        .transcript-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .transcript-body {
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        /* 1. 讓輸入框採用系統深色模式 (原生箭頭會自動變成淺色/白色) */
+        input[type="number"].input-field {
+            color-scheme: dark;
+        }
+
+        /* 2. 針對 Chrome, Safari, Edge 裝飾原生上下箭頭 */
+        input[type="number"].input-field::-webkit-inner-spin-button,
+        input[type="number"].input-field::-webkit-outer-spin-button {
+            /* 平常保持一點半透明，讓畫面更乾淨 */
+            opacity: 0.6;
+            cursor: pointer;
+            transition: opacity 0.3s ease-in-out;
+
+            /* 稍微加寬讓滑鼠更好點擊 */
+            width: 20px;
+
+            /* 如果你的輸入框有 padding，這個可以讓箭頭更貼合邊緣 */
+            margin-right: -8px;
+        }
+
+        /* 3. 滑鼠移上去時的發光/亮起效果 */
+        input[type="number"].input-field::-webkit-inner-spin-button:hover,
+        input[type="number"].input-field::-webkit-outer-spin-button:hover {
+            opacity: 1;
+        }
+
+        /* 針對 Firefox 的備用設定 (Firefox 對箭頭樣式的支援度較低，但至少確保顯示) */
+        input[type="number"].input-field {
+            -moz-appearance: number-input;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-layout">
+
+        <div id="sidebarOverlay" class="sidebar-overlay hidden" onclick="toggleSidebar()"></div>
+
+        <div class="sidebar collapsed">
+            <div class="sidebar-title" style="color:white; font-size:18px; font-weight:bold; margin-bottom: 20px;">AI
+                面試生態系</div>
+            <div id="menu-interview" class="menu-item active" onclick="switchFeature('interview')">
+                模擬面試系統
+            </div>
+            <div id="menu-jd" class="menu-item" onclick="switchFeature('jd')">
+                履歷與職缺診斷
+            </div>
+            <div id="menu-dashboard" class="menu-item" onclick="switchFeature('dashboard')">
+                面試數據儀表板
+            </div>
+            <div class="menu-item" onclick="logout()">
+                登出
+            </div>
+        </div>
+
+        <div class="main-content">
+
+            <header
+                style="position: sticky; top: 0; z-index: 50; background: rgba(15, 20, 30, 0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button id="sidebarToggle" onclick="toggleSidebar()"
+                        style="background: transparent; border: none; color: var(--text-main); font-size: 24px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background 0.2s;">
+                        ☰
+                    </button>
+                    <div class="logo" style="margin: 0;">
+                        <div class="logo-icon">I</div>
+                        Interview Pro
+                    </div>
+                </div>
+            </header>
+
+            <div class="container">
+
+                <div id="view-jd" class="view-section">
+                    <div class="hero" style="text-align: left; padding: 0 0 20px 0;">
+                        <h1>履歷與 JD 契合度診斷</h1>
+                        <p>上傳您的履歷並貼上職缺描述，AI 將為您進行 ATS 系統初篩與考題預測。</p>
+                    </div>
+
+                    <div class="setup-card" style="flex-direction: column; gap: 24px;">
+                        <div class="upload-zone" id="uploadZone">
+                            <input type="file" id="resumeUpload" accept=".pdf,.doc,.docx" hidden>
+                            <div class="upload-text" id="uploadText" style="color: #bababa;">點擊或將履歷拖曳至此 (支援 PDF)</div>
+                        </div>
+
+                        <div class="input-group" style="width: 100%;">
+                            <label for="jobDescription">Job Description (JD) 職缺描述 <span
+                                    style="font-size: 12px; color: var(--accent);">(選填，可大幅提升考題精準度)</span></label>
+                            <textarea id="jobDescription" class="input-field" rows="6"
+                                placeholder="請貼上真實的職缺要求與工作內容（例如從 104 或 LinkedIn 複製），AI 將為您預測致命考題..."></textarea>
+                        </div>
+
+                        <div style="display: flex; gap: 24px; width: 100%;">
+                            <div class="input-group" style="flex: 1;">
+                                <label for="jdJobTitle">Target Role</label>
+                                <input type="text" id="jdJobTitle" class="input-field"
+                                    placeholder="e.g. Data Scientist">
+                            </div>
+                            <div class="input-group" style="flex: 1;">
+                                <label for="jdCompanyName">Company Name</label>
+                                <input type="text" id="jdCompanyName" class="input-field" placeholder="e.g. Google">
+                            </div>
+                        </div>
+
+                        <div style="width: 100%; display: flex; flex-direction: column; gap: 12px;">
+                            <button type="button" id="analyzeJdBtn" onclick="analyzeResumeMatch()" class="toggle-btn"
+                                style="width: 100%; border-color: #f59e0b; color: #f59e0b; padding: 12px; font-size: 16px;">
+                                預先分析履歷契合度與預測考題
+                            </button>
+
+                            <div id="jdAnalysisResult" class="hidden"
+                                style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 20px; font-size: 15px; line-height: 1.6;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(245, 158, 11, 0.2); padding-bottom: 12px;">
+                                    <strong style="color: #f59e0b; font-size: 18px;">ATS 系統初篩報告</strong>
+                                    <span id="jdMatchScore"
+                                        style="font-weight: bold; font-size: 24px; color: white;">--%</span>
+                                </div>
+                                <div style="margin-bottom: 12px;"><strong>履歷缺乏關鍵字：</strong> <span id="jdMissingSkills"
+                                        style="color: var(--text-muted);"></span></div>
+                                <div style="margin-bottom: 12px;">
+                                    <strong>🎯 預測面試必考題：</strong>
+                                    <ul id="jdPredictedQs" style="margin: 8px 0 0 24px; color: var(--text-muted);"></ul>
+                                </div>
+                                <div
+                                    style="color: #10b981; font-style: italic; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.2);">
+                                    💡 建議：<span id="jdAdvice"></span>
+                                </div>
+                                <button onclick="switchFeature('jd')" class="btn btn-start"
+                                    style="margin-top: 24px; width: 100%;">
+                                    再試一次
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= 面試模擬區塊 ================= -->
+                <div id="view-interview" class="view-section active">
+                    <div class="hero">
+                        <h1>進行模擬面試</h1>
+                        <p>請設定面試條件並上傳您的履歷（選填），AI 將根據您的背景展開深度提問。</p>
+                    </div>
+
+                    <div class="setup-card" id="setupCard"
+                        style="flex-direction: column; gap: 24px; margin-bottom: 24px;">
+
+                        <div style="display: flex; gap: 24px; width: 100%;">
+                            <div class="input-group" style="flex: 1; min-width: 100px; position: relative;">
+                                <label>Type</label>
+                                <input type="hidden" id="interviewType" value="job">
+                                <div class="custom-select-trigger" id="typeSelectTrigger" onclick="toggleDropdown()">
+                                    <span id="typeSelectText">職場面試</span>
+                                    <span style="font-size: 12px; color: var(--text-muted);">▼</span>
+                                </div>
+                                <div class="custom-options" id="typeOptions">
+                                    <div class="custom-option selected" onclick="selectType('job', '職場面試')">職場面試</div>
+                                    <div class="custom-option" onclick="selectType('academic', '升學面試')">升學面試</div>
+                                </div>
+                            </div>
+
+                            <div class="input-group" style="flex: 1; min-width: 110px; position: relative;">
+                                <label>Language</label>
+                                <input type="hidden" id="interviewLanguage" value="zh">
+                                <div class="custom-select-trigger" id="langSelectTrigger"
+                                    onclick="toggleLangDropdown()">
+                                    <span id="langSelectText">中文面試</span>
+                                    <span style="font-size: 12px; color: var(--text-muted);">▼</span>
+                                </div>
+                                <div class="custom-options" id="langOptions">
+                                    <div class="custom-option selected" onclick="selectLang('zh', '中文面試')">中文面試</div>
+                                    <div class="custom-option" onclick="selectLang('en', 'English')">English</div>
+                                </div>
+                            </div>
+
+
+                            <div class="input-group" style="flex: 1; min-width: 90px;">
+                                <label for="interviewRounds">Rounds</label>
+                                <input type="number" id="interviewRounds" class="input-field" value="5" min="1" max="20"
+                                    placeholder="題數">
+                            </div>
+                        </div>
+
+                        <div class="input-group" style="flex: 1.2;">
+                            <label for="jobTitle">Role</label>
+                            <input type="text" id="jobTitle" class="input-field" placeholder="e.g. Data Scientist">
+                        </div>
+
+                        <div class="input-group" style="flex: 1.2;">
+                            <label for="companyName">Sector</label>
+                            <input type="text" id="companyName" class="input-field" placeholder="e.g. Google">
+                        </div>
+
+                        <!-- 🔥 修改 2：新增面試專用的上傳區塊 -->
+                        <div class="upload-zone" id="interviewUploadZone" style="padding: 24px 20px;">
+                            <input type="file" id="interviewResumeUpload" accept=".pdf" hidden>
+                            <div class="upload-text" id="interviewUploadText" style="color: #bababa;">點擊或將面試履歷拖曳至此
+                                (支援 PDF)</div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="canvas-card">
+                    <div class="dialogue-box" id="dialogueBox">
+                        <div class="system-text">> awaiting user parameters...</div>
+                    </div>
+
+                    <div class="action-area">
+                        <div class="visualizer-container" id="visualizerContainer">
+                            <canvas id="visualizer"></canvas>
+                        </div>
+
+                        <div id="inputModeToggle" class="hidden"
+                            style="display: flex; gap: 12px; margin-bottom: 16px; justify-content: center;">
+                            <button type="button" id="modeVoiceBtn" class="toggle-btn active"
+                                onclick="switchInputMode('voice')">語音回答</button>
+                            <button type="button" id="modeTextBtn" class="toggle-btn"
+                                onclick="switchInputMode('text')">打字回答</button>
+                        </div>
+
+                        <div id="textInputContainer" class="hidden"
+                            style="display: flex; gap: 12px; width: 100%; max-width: 600px; margin: 0 auto 16px;">
+                            <input type="text" id="userTextInput" placeholder="請輸入你的回答並點擊送出..."
+                                style="flex: 1; padding: 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: white; border: 1px solid rgba(14, 165, 233, 0.3); font-size: 15px;">
+                            <button id="sendTextBtn" onclick="submitTextAnswer()"
+                                style="padding: 12px 24px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s;">送出</button>
+                        </div>
+
+                        <div class="controls">
+                            <button id="mainBtn" class="btn btn-start" disabled>INITIATE SEQUENCE</button>
+                            <button id="stopBtn" class="btn btn-stop" onclick="stopInterviewWorkflow()"
+                                style="display: none;">TRANSMIT AUDIO</button>
+                        </div>
+
+                        <div class="status" id="statusText">
+                            <div class="status-dot" id="statusIndicator"></div>
+                            <span id="statusLabel">Standby</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="reportCard" class="view-section" style="display: none; max-width: 1200px; width: 80%; margin: 12px auto 40px auto; padding: 32px; background: var(--bg-card); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                <div class="report-header">
+                    <div class="report-title-wrapper">
+                        <h1 class="header-title" id="detailRole" style="margin:0;">載入中...</h1>
+                        <div style="color: var(--text-muted); font-family: monospace;" id="detailDate"></div>
+                    </div>
+                    <div class="report-total-score">
+                        <div class="score-label">TOTAL SCORE</div>
+                        <div class="score-number" id="detailScore">0</div>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">核心能力雷達解析</div>
+                        <div id="skillsContainer"></div>
+                    </div>
+                    <div class="metric-card" style="display: flex; flex-direction: column; justify-content: center;">
+                        <div class="metric-title">系統綜合短評</div>
+                        <p id="detailFeedback"
+                            style="font-size: 18px; line-height: 1.6; color: var(--text-main); margin: 0;"></p>
+                    </div>
+                </div>
+
+                <div class="feedback-grid">
+                    <div class="feedback-panel good">
+                        <div class="metric-title" style="color: var(--success);">💡 表現亮點</div>
+                        <ul class="feedback-list" id="strengthsList"></ul>
+                    </div>
+                    <div class="feedback-panel bad">
+                        <div class="metric-title" style="color: var(--warning);">🔧 待改進建議</div>
+                        <ul class="feedback-list" id="improvementsList"></ul>
+                    </div>
+                </div>
+
+                <div class="transcript-container">
+                    <div class="transcript-header">💬 完整面試逐字稿</div>
+                    <div class="transcript-body" id="transcriptBody"></div>
+                </div>
+            </section>
+
+            <audio id="aiPlayer" style="display: none;"></audio>
+
+        </div>
+    </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+    <script src="growth-v2.js"></script>
+
+</body>
+
+</html>
