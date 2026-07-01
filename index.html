@@ -17,7 +17,7 @@
             --border: rgba(14, 165, 233, 0.2);
             --text-main: #f8fafc;
             --text-muted: #8ba3cb;
-            --accent: #5dccff;
+            --accent: #1182b7;
             --accent-hover: #73d0ff;
             --accent-glow: rgba(14, 165, 233, 0.4);
             --radius-lg: 24px;
@@ -135,13 +135,21 @@
 
         /* ============== 主內容區 ============== */
         .main-content {
+            width: 100%;
             flex: 1;
-            height: 100vh;
-            overflow-y: auto;
-            position: relative;
+            overflow-x: hidden;
+            /* 防止內容撐開導致版面位移 */
             display: flex;
             flex-direction: column;
-            align-items: center;
+        }
+
+        #reportCard {
+            width: 90%;
+            /* 從 80% 改為 90% 會看起來更自然 */
+            max-width: 1000px;
+            margin: 24px auto;
+            /* auto 置中 */
+            box-sizing: border-box;
         }
 
         .container {
@@ -247,7 +255,6 @@
             border-radius: 8px;
             overflow: hidden;
 
-            /* 🔥 關鍵修正 1：給選單一個萬能圖層金牌，數字越大代表越在威風的最上層！ */
             z-index: 9999;
 
             display: none;
@@ -412,16 +419,11 @@
         }
 
         .dialogue-box {
-            /* ❌ 刪除這行： height: 550px; */
-
-            /* 🔥 加上這三行，讓它具有「彈性生長」的超能力： */
             height: auto;
             /* 讓高度根據內容多寡自然變化 */
             min-height: 80px;
             /* 給一個最小高度，讓第一句話有空間 */
             max-height: 550px;
-            /* 設定生長極限！超過這個高度才出現捲軸 */
-
             padding: 40px;
             overflow-y: auto;
             display: flex;
@@ -435,6 +437,34 @@
             background: transparent;
         }
 
+        ::-webkit-scrollbar {
+            width: 8px;
+            /* 垂直滾動條寬度 */
+            height: 8px;
+            /* 水平滾動條高度 */
+        }
+
+        /* 軌道 (背景) */
+        ::-webkit-scrollbar-track {
+            background: rgba(17, 24, 39, 0.8);
+            /* 深灰背景 */
+            border-radius: 4px;
+        }
+
+        /* 捲軸把手 (Thumb) */
+        ::-webkit-scrollbar-thumb {
+            background: rgba(75, 85, 99, 0.6);
+            /* 預設灰色 */
+            border-radius: 4px;
+            border: 2px solid rgba(17, 24, 39, 0.8);
+            /* 做出留白效果 */
+        }
+
+        /* 捲軸懸停時的樣子 */
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+            /* 滑鼠懸停時變成你設定的藍色主題色 */
+        }
 
         .msg-block {
             display: flex;
@@ -641,17 +671,7 @@
         }
 
         /* 為了配合 CSS 共用，這裡替報告卡片加上 dashboard 的基礎樣式 */
-        #reportCard {
-            background: var(--bg-card);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 40px;
-            margin-top: 24px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            color: var(--text-main);
-        }
+
 
         .report-header {
             display: flex;
@@ -659,7 +679,7 @@
             align-items: flex-end;
             margin-bottom: 32px;
             padding-bottom: 24px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-light);
         }
 
         .report-title-wrapper {
@@ -670,6 +690,22 @@
 
         .report-total-score {
             text-align: right;
+        }
+
+        #growthZone {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            overflow: hidden;
+        }
+
+        /* 按鈕不一定要 80%，給它一點彈性或設為 100% 比較美觀 */
+        #growthZone button {
+            display: flex;
+            margin: 0 auto;
         }
 
         .score-label {
@@ -823,6 +859,77 @@
         input[type="number"].input-field {
             -moz-appearance: number-input;
         }
+
+        /* 技能標籤樣式 */
+        .skill-pill {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .skill-pill.match {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .skill-pill.miss {
+            background: rgba(248, 113, 113, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+
+        /* 改寫建議卡片 */
+        .revision-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .revision-before {
+            color: #f87171;
+            font-size: 14px;
+            text-decoration: line-through;
+            opacity: 0.8;
+        }
+
+        .revision-after {
+            color: #10b981;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .revision-reason {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 4px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+            padding-top: 8px;
+        }
+
+        /* 預測考題卡片 */
+        .question-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 3px solid #a78bfa;
+            border-radius: 4px 8px 8px 4px;
+            padding: 12px 16px;
+        }
+
+        .q-title {
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .q-intent {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
     </style>
 </head>
 
@@ -832,8 +939,9 @@
         <div id="sidebarOverlay" class="sidebar-overlay hidden" onclick="toggleSidebar()"></div>
 
         <div class="sidebar collapsed">
-            <div class="sidebar-title" style="color:white; font-size:18px; font-weight:bold; margin-bottom: 20px;">AI
-                面試生態系</div>
+            <div class="sidebar-title" style="color:white; font-size:18px; font-weight:bold; margin-bottom: 20px;">
+                AI 面試生態系
+            </div>
             <div id="menu-interview" class="menu-item active" onclick="switchFeature('interview')">
                 模擬面試系統
             </div>
@@ -902,35 +1010,93 @@
                                 style="width: 100%; border-color: #f59e0b; color: #f59e0b; padding: 12px; font-size: 16px;">
                                 預先分析履歷契合度與預測考題
                             </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="view-report" class="view-section">
+                    <div class="hero">
+                        <h1>履歷比對報告</h1>
+                    </div>
+                    <div id="reportContainer">
+                        <div id="jdAnalysisResult"
+                            style="margin-top: 32px; display: flex; flex-direction: column; gap: 24px;">
 
-                            <div id="jdAnalysisResult" class="hidden"
-                                style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 20px; font-size: 15px; line-height: 1.6;">
+                            <div style="display: flex; gap: 24px; align-items: stretch; flex-wrap: wrap;">
                                 <div
-                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(245, 158, 11, 0.2); padding-bottom: 12px;">
-                                    <strong style="color: #f59e0b; font-size: 18px;">ATS 系統初篩報告</strong>
-                                    <span id="jdMatchScore"
-                                        style="font-weight: bold; font-size: 24px; color: white;">--%</span>
+                                    style="flex: 1; min-width: 200px; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                                    <div
+                                        style="font-size: 14px; color: var(--accent); font-weight: bold; margin-bottom: 8px; letter-spacing: 0.1em;">
+                                        ATS 契合度</div>
+                                    <div style="display: flex; align-items: baseline; gap: 4px;">
+                                        <span id="jdMatchScore"
+                                            style="font-size: 56px; font-weight: 900; color: white; line-height: 1;">--</span>
+                                        <span style="font-size: 20px; color: var(--text-muted);">%</span>
+                                    </div>
+                                    <div id="jdScoreLabel" style="margin-top: 8px; font-size: 14px; color: #10b981;">
+                                        高機率通過初篩</div>
                                 </div>
-                                <div style="margin-bottom: 12px;"><strong>履歷缺乏關鍵字：</strong> <span id="jdMissingSkills"
-                                        style="color: var(--text-muted);"></span></div>
-                                <div style="margin-bottom: 12px;">
-                                    <strong>🎯 預測面試必考題：</strong>
-                                    <ul id="jdPredictedQs" style="margin: 8px 0 0 24px; color: var(--text-muted);"></ul>
-                                </div>
+
                                 <div
-                                    style="color: #10b981; font-style: italic; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(16, 185, 129, 0.2);">
-                                    💡 建議：<span id="jdAdvice"></span>
+                                    style="flex: 2; min-width: 300px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-light); border-radius: 12px; padding: 24px;">
+                                    <h3 style="margin: 0 0 12px 0; font-size: 16px; color: var(--text-main);">AI
+                                        綜合評估</h3>
+                                    <p id="jdSummary"
+                                        style="margin: 0; color: var(--text-muted); line-height: 1.6; font-size: 15px;">
+                                        正在等待分析結果...
+                                    </p>
                                 </div>
-                                <button onclick="switchFeature('jd')" class="btn btn-start"
-                                    style="margin-top: 24px; width: 100%;">
-                                    再試一次
+                            </div>
+
+                            <div
+                                style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-light); border-radius: 12px; padding: 24px;">
+                                <h3 style="margin: 0 0 16px 0; font-size: 16px; color: var(--text-main);">關鍵字比對
+                                    (Keyword Analysis)</h3>
+                                <div style="display: flex; flex-direction: column; gap: 16px;">
+                                    <div>
+                                        <div
+                                            style="font-size: 13px; color: #10b981; margin-bottom: 8px; font-weight: bold;">
+                                            已命中的 JD 關鍵字</div>
+                                        <div id="jdMatchedSkills" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div
+                                            style="font-size: 13px; color: #f87171; margin-bottom: 8px; font-weight: bold;">
+                                            缺失或需強化的關鍵字</div>
+                                        <div id="jdMissingSkills" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                style="background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 24px;">
+                                <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #f59e0b;">履歷高分改寫建議</h3>
+                                <div id="jdResumeTips" style="display: flex; flex-direction: column; gap: 16px;">
+                                </div>
+                            </div>
+
+                            <div
+                                style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 24px;">
+                                <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #a78bfa;">預測面試必考題與意圖</h3>
+                                <div id="jdPredictedQs" style="display: flex; flex-direction: column; gap: 12px;">
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 16px; margin-top: 12px;">
+                                <button onclick="switchFeature('jd')"
+                                    style="flex: 1; padding: 16px; background: transparent; border: 1px solid var(--border-light); color: var(--text-main); border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.2s;">
+                                    重新分析另一份 JD
+                                </button>
+                                <button onclick="transferToInterview()"
+                                    style="flex: 2; padding: 16px; background: var(--accent); border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.2s; box-shadow: 0 0 20px var(--accent-glow);">
+                                    帶著這份報告，立刻開始模擬面試
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ================= 面試模擬區塊 ================= -->
                 <div id="view-interview" class="view-section active">
                     <div class="hero">
                         <h1>進行模擬面試</h1>
@@ -939,37 +1105,58 @@
 
                     <div class="setup-card" id="setupCard"
                         style="flex-direction: column; gap: 24px; margin-bottom: 24px;">
-
                         <div style="display: flex; gap: 24px; width: 100%;">
                             <div class="input-group" style="flex: 1; min-width: 100px; position: relative;">
                                 <label>Type</label>
                                 <input type="hidden" id="interviewType" value="job">
-                                <div class="custom-select-trigger" id="typeSelectTrigger" onclick="toggleDropdown()">
+                                <div class="custom-select-trigger" id="typeSelectTrigger"
+                                    onclick="toggleDropdown('typeOptions')">
                                     <span id="typeSelectText">職場面試</span>
                                     <span style="font-size: 12px; color: var(--text-muted);">▼</span>
                                 </div>
                                 <div class="custom-options" id="typeOptions">
-                                    <div class="custom-option selected" onclick="selectType('job', '職場面試')">職場面試</div>
-                                    <div class="custom-option" onclick="selectType('academic', '升學面試')">升學面試</div>
+                                    <div class="custom-option selected" onclick="selectOption('type', 'job', '職場面試')">
+                                        職場面試</div>
+                                    <div class="custom-option" onclick="selectOption('type', 'academic', '升學面試')">升學面試
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="input-group" style="flex: 1; min-width: 110px; position: relative;">
+                            <!-- 2. Language -->
+                            <div class="input-group" style="flex: 1; min-width: 100px; position: relative;">
                                 <label>Language</label>
                                 <input type="hidden" id="interviewLanguage" value="zh">
                                 <div class="custom-select-trigger" id="langSelectTrigger"
-                                    onclick="toggleLangDropdown()">
-                                    <span id="langSelectText">中文面試</span>
+                                    onclick="toggleDropdown('langOptions')">
+                                    <span id="langSelectText">中文</span>
                                     <span style="font-size: 12px; color: var(--text-muted);">▼</span>
                                 </div>
                                 <div class="custom-options" id="langOptions">
-                                    <div class="custom-option selected" onclick="selectLang('zh', '中文面試')">中文面試</div>
-                                    <div class="custom-option" onclick="selectLang('en', 'English')">English</div>
+                                    <div class="custom-option selected" onclick="selectOption('lang', 'zh', '中文')">中文
+                                    </div>
+                                    <div class="custom-option" onclick="selectOption('lang', 'en', 'English')">English
+                                    </div>
                                 </div>
                             </div>
 
+                            <div class="input-group" style="flex: 1; min-width: 100px; position: relative;">
+                                <label>Difficulty</label>
+                                <input type="hidden" id="interviewDifficulty" value="medium">
+                                <div class="custom-select-trigger" id="diffSelectTrigger"
+                                    onclick="toggleDropdown('diffOptions')">
+                                    <span id="diffSelectText">中級</span>
+                                    <span style="font-size: 12px; color: var(--text-muted);">▼</span>
+                                </div>
+                                <div class="custom-options" id="diffOptions">
+                                    <div class="custom-option" onclick="selectOption('diff', 'easy', '初級')">初級</div>
+                                    <div class="custom-option selected" onclick="selectOption('diff', 'medium', '中級')">
+                                        中級</div>
+                                    <div class="custom-option" onclick="selectOption('diff', 'hard', '高級')">高級</div>
+                                </div>
+                            </div>
 
-                            <div class="input-group" style="flex: 1; min-width: 90px;">
+                            <!-- 4. Rounds -->
+                            <div class="input-group" style="flex: 1; min-width: 80px;">
                                 <label for="interviewRounds">Rounds</label>
                                 <input type="number" id="interviewRounds" class="input-field" value="5" min="1" max="20"
                                     placeholder="題數">
@@ -986,15 +1173,13 @@
                             <input type="text" id="companyName" class="input-field" placeholder="e.g. Google">
                         </div>
 
-                        <!-- 🔥 修改 2：新增面試專用的上傳區塊 -->
                         <div class="upload-zone" id="interviewUploadZone" style="padding: 24px 20px;">
                             <input type="file" id="interviewResumeUpload" accept=".pdf" hidden>
-                            <div class="upload-text" id="interviewUploadText" style="color: #bababa;">點擊或將面試履歷拖曳至此
-                                (支援 PDF)</div>
+                            <div class="upload-text" id="interviewUploadText" style="color: #bababa;">點擊或將面試履歷拖曳至此 (支援
+                                PDF)</div>
                         </div>
                     </div>
                 </div>
-
 
                 <div class="canvas-card">
                     <div class="dialogue-box" id="dialogueBox">
@@ -1034,9 +1219,9 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div id="reportCard" class="view-section" style="display: none; max-width: 1200px; width: 80%; margin: 12px auto 40px auto; padding: 32px; background: var(--bg-card); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            </div>
+            <div id="reportCard" class="view-section">
                 <div class="report-header">
                     <div class="report-title-wrapper">
                         <h1 class="header-title" id="detailRole" style="margin:0;">載入中...</h1>
@@ -1062,32 +1247,30 @@
 
                 <div class="feedback-grid">
                     <div class="feedback-panel good">
-                        <div class="metric-title" style="color: var(--success);">💡 表現亮點</div>
+                        <div class="metric-title" style="color: var(--success);">表現亮點</div>
                         <ul class="feedback-list" id="strengthsList"></ul>
                     </div>
                     <div class="feedback-panel bad">
-                        <div class="metric-title" style="color: var(--warning);">🔧 待改進建議</div>
+                        <div class="metric-title" style="color: var(--warning);">待改進建議</div>
                         <ul class="feedback-list" id="improvementsList"></ul>
                     </div>
                 </div>
 
                 <div class="transcript-container">
-                    <div class="transcript-header">💬 完整面試逐字稿</div>
+                    <div class="transcript-header">完整面試逐字稿</div>
                     <div class="transcript-body" id="transcriptBody"></div>
                 </div>
-            </section>
 
-            <audio id="aiPlayer" style="display: none;"></audio>
-
+                <div id="growthZone"
+                    style="display:none; margin: 40px 0; padding: 20px; border-top: 1px solid var(--border-light);">
+                </div>
+            </div> <audio id="aiPlayer" style="display: none;"></audio>
         </div>
     </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
     <script src="app.js"></script>
     <script src="growth-v2.js"></script>
-
 </body>
 
 </html>

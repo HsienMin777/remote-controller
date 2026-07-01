@@ -1,0 +1,17 @@
+# Python 暫存檔
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虛擬環境
+venv/
+env/
+.venv/
+
+# 環境變數 (重要！保護你的 OpenAI 和 Supabase 金鑰)
+.env
+
+# 編輯器暫存
+.vscode/
+.idea/
+*.swp

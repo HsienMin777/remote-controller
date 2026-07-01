@@ -526,6 +526,35 @@
             color: var(--text-main);
         }
 
+        ::-webkit-scrollbar {
+            width: 8px;
+            /* 垂直滾動條寬度 */
+            height: 8px;
+            /* 水平滾動條高度 */
+        }
+
+        /* 軌道 (背景) */
+        ::-webkit-scrollbar-track {
+            background: rgba(17, 24, 39, 0.8);
+            /* 深灰背景 */
+            border-radius: 4px;
+        }
+
+        /* 捲軸把手 (Thumb) */
+        ::-webkit-scrollbar-thumb {
+            background: rgba(75, 85, 99, 0.6);
+            /* 預設灰色 */
+            border-radius: 4px;
+            border: 2px solid rgba(17, 24, 39, 0.8);
+            /* 做出留白效果 */
+        }
+
+        /* 捲軸懸停時的樣子 */
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+            /* 滑鼠懸停時變成你設定的藍色主題色 */
+        }
+
         .transcript-body::-webkit-scrollbar {
             width: 6px;
         }
@@ -625,7 +654,7 @@
                     <div class="chart-container">
                         <div class="chart-header">
                             <div class="chart-title">歷史面試成長趨勢</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">近 4 次紀錄</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">近 10 次紀錄</div>
                         </div>
                         <canvas id="trendChart"></canvas>
                     </div>
@@ -681,10 +710,20 @@
                         <div class="transcript-body" id="transcriptBody">
                         </div>
                     </div>
-
-                    <div id="growthZone"
-                        style="margin-top: 32px; padding: 24px; background: rgba(14, 165, 233, 0.05); border: 1px solid var(--border); border-radius: 16px; display: none;">
+                    <div id="growthZone" class="view-section">
+                        <div class="transcript-container" id="redemptionHistoryContainer"
+                            style="display: none; margin-bottom: 24px; border-color: var(--accent);">
+                            <div class="transcript-header"
+                                style="background: rgba(14, 165, 233, 0.1); color: var(--accent); border-bottom: 1px solid rgba(14, 165, 233, 0.3);">
+                                🔥 復盤盲點與建議紀錄
+                            </div>
+                            <div class="transcript-body" id="redemptionHistoryList"
+                                style="display: flex; flex-direction: column; gap: 16px; background: rgba(0, 0, 0, 0.1);">
+                            </div>
+                        </div>
                     </div>
+
+
                 </section>
 
             </div>
@@ -843,7 +882,7 @@
                     // 🔥 修復排序邏輯：
                     // 1. 先從 realData 抓出最近的 4 筆 (因為 realData 本來就是最新到最舊，所以取 slice(0, 4))
                     // 2. 將這 4 筆反轉 (reverse)，變成「舊 -> 新」，這樣畫出來的時間軸才正確！
-                    const chartData = realData.slice(0, 4).reverse();
+                    const chartData = realData.slice(0, 10).reverse();
 
                     const scores = chartData.map(d => d.totalScore || 0);
                     const labels = chartData.map(d => {
@@ -1034,7 +1073,7 @@
         </div>
 
         <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent);">
-            <div style="font-weight: bold; margin-bottom: 8px;">👨‍🏫 教練總結</div>
+            <div style="font-weight: bold; margin-bottom: 8px;">總結</div>
             <div style="color: var(--text-main); line-height: 1.6;">${data.coach_comment}</div>
         </div>
     `;
