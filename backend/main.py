@@ -724,19 +724,22 @@ async def generate_redemption(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# index.html / login.html 位於專案根目錄 (不在 frontend/ 底下)，只個別開放這兩個檔案，
-# 避免把整個專案根目錄 (含 .env、backend 原始碼) 掛上網路。
-# 🔥 router.js 產生的網址是 "index.html?feature=xxx" (而非 "/")，重新整理或直接訪問該網址
-#    時瀏覽器會真的發出請求，所以 "/" 與 "/index.html" 都要對應到同一個檔案。
+# 🔥 index.html / login.html 現在已經搬進 frontend/pages/ 底下（跟其他分頁放一起），
+#    不再是專案根目錄的獨立檔案。但 "/" 與裸網址 "/index.html"／"/login.html"（不帶
+#    /frontend/pages/ 前綴）還是要繼續能訪問到——router.js 產生的網址是
+#    "index.html?feature=xxx" 這種形式而非 "/"，重新整理或直接訪問該網址時瀏覽器會真的
+#    發出請求；另外也保留舊網址相容性，避免任何還指向舊路徑的書籤/連結失效。
+#    實際檔案改讀 frontend/pages/ 底下的新位置，不用另外把整個專案根目錄掛上網路。
 @app.get("/", include_in_schema=False)
 @app.get("/index.html", include_in_schema=False)
 async def serve_home():
-    return FileResponse(os.path.join(BASE_DIR, "index.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "pages", "index.html"))
 
 @app.get("/login.html", include_in_schema=False)
 async def serve_login():
-    return FileResponse(os.path.join(BASE_DIR, "login.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "pages", "login.html"))
 
-# frontend/ 底下的靜態資源掛在 /frontend，對應 index.html/login.html 內
-# 「./frontend/js/xxx.js」與各分頁 (pages/*.html) 內「./../js/xxx.js」的相對路徑寫法。
+# frontend/ 底下的靜態資源掛在 /frontend，對應 frontend/pages/*.html（含現在也搬進來的
+# index.html/login.html）內「./../js/xxx.js」的相對路徑寫法，同時也讓
+# /frontend/pages/index.html、/frontend/pages/login.html 這種完整路徑能直接被訪問到。
 app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend-static")

@@ -988,7 +988,7 @@
                         // Dashboard → 回主頁 (加上參數，讓首頁知道要打開哪個功能)
                         if (featureName === 'interview' || featureName === 'jd') {
                             // ✅ 修正：加上斜線與 BASE_PATH，強制讓瀏覽器清空子路徑，回到主頁
-                            window.location.href = `${BASE_PATH}/index.html?feature=${featureName}`;
+                            window.location.href = `${BASE_PATH}/frontend/pages/index.html?feature=${featureName}`;
                             return;
                         }
                     } else {

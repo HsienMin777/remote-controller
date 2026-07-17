@@ -66,10 +66,10 @@ function navigateTo(feature) {
 function executeRedirect(targetFeature) {
     if (targetFeature === 'interview') {
         // 回首頁且預設就是面試，不需要帶任何參數，保持網址最乾淨
-        window.location.href = `${BASE_PATH}/index.html`;
+        window.location.href = `${BASE_PATH}/frontend/pages/index.html`;
     } else {
         // 其他功能（calendar, jd, dashboard）精準帶上參數
-        window.location.href = `${BASE_PATH}/index.html?feature=${targetFeature}`;
+        window.location.href = `${BASE_PATH}/frontend/pages/index.html?feature=${targetFeature}`;
     }
 }
 

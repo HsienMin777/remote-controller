@@ -11,7 +11,7 @@ async function initCalendarSystem() {
     // 檢查是否登入 (supabaseClient 由 auth.js 建立)
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
-        window.location.href = '/login.html'; // 若沒登入強制導回登入頁
+        window.location.href = '/frontend/pages/login.html'; // 若沒登入強制導回登入頁
         return;
     }
 
@@ -25,7 +25,7 @@ async function initCalendarSystem() {
 
 async function logout() {
     await supabaseClient.auth.signOut();
-    window.location.href = '/login.html';
+    window.location.href = '/frontend/pages/login.html';
 }
 
 // ---------------------------
@@ -195,7 +195,7 @@ function prepareForBattle(event, id) {
 
         // 使用絕對路徑跳回主首頁，並直接切換到 AI 面試模擬模式
         const rootPath = window.location.origin;
-        window.location.href = `${rootPath}/index.html?feature=interview`;
+        window.location.href = `${rootPath}/frontend/pages/index.html?feature=interview`;
     }
 }
 

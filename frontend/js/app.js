@@ -155,24 +155,26 @@ function switchFeature(featureName, options = {}) {
     const { updateHistory = true } = options;
 
     // 0. 這些功能都是獨立頁面（不是 index.html 內部的 view-section），直接跳轉過去
+    // 🔥 用絕對路徑 (/frontend/pages/xxx.html)：index.html 現在也在 frontend/pages/ 底下，
+    //    原本沒帶開頭斜線的相對路徑會被瀏覽器誤解成 frontend/pages/frontend/pages/xxx.html
     if (featureName === 'calendar') {
-        window.location.href = 'frontend/pages/calendar.html';
+        window.location.href = '/frontend/pages/calendar.html';
         return;
     }
     if (featureName === 'dashboard') {
-        window.location.href = 'frontend/pages/dashboard.html';
+        window.location.href = '/frontend/pages/dashboard.html';
         return;
     }
     if (featureName === 'resume-records') {
-        window.location.href = 'frontend/pages/resume_records.html';
+        window.location.href = '/frontend/pages/resume_records.html';
         return;
     }
     if (featureName === 'consultant') {
-        window.location.href = 'frontend/pages/consultant.html';
+        window.location.href = '/frontend/pages/consultant.html';
         return;
     }
     if (featureName === 'settings') {
-        window.location.href = 'frontend/pages/settings.html';
+        window.location.href = '/frontend/pages/settings.html';
         return;
     }
 
