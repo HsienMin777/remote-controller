@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 25 python -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"docs: %{http_code}\\\\n\" http://127.0.0.1:8000/docs)",
+      "Bash(curl -s -w \"\\\\nhistory status: %{http_code}\\\\n\" http://127.0.0.1:8000/api/interview/history)",
+      "Bash(taskkill //F //IM python.exe //FI \"WINDOWTITLE eq *uvicorn*\")",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w \"still up? %{http_code}\\\\n\" --max-time 3 http://127.0.0.1:8000/docs)",
+      "Bash(node --check frontend/js/interview.js)"
+    ]
+  }
+}

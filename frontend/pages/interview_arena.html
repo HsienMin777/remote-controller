@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="./../js/theme-init.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模擬面試進行中</title>
+    <style>
+        /* 🌟 Clean B2B / Fintech 風格（與 index.html / calendar.html 完全一致的設計變數） */
+        :root {
+            --bg-page: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --border: #E2E8F0;
+            --text-main: #0F172A;
+            --text-muted: #475569;
+            --accent: #1E3A8A;
+            --accent-hover: #1E40AF;
+            --accent-glow: rgba(30, 58, 138, 0.14);
+            --danger: #DC2626;
+            --radius-lg: 1.25rem;
+            --radius-md: 0.75rem;
+            --radius-sm: 0.5rem;
+
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(226, 232, 240, 0.6);
+            --overlay-bg: rgba(15, 23, 42, 0.15);
+            --hover-tint: rgba(30, 58, 138, 0.06);
+            --active-tint: rgba(30, 58, 138, 0.08);
+            --card-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.1), 0 4px 16px rgba(15, 23, 42, 0.04);
+            --sidebar-shadow: 4px 0 24px rgba(15, 23, 42, 0.05);
+            --scrollbar-track: #F1F5F9;
+            --scrollbar-thumb: #CBD5E1;
+        }
+
+        /* 🌙 暗色模式：由 theme-init.js 在 <html> 加上 .dark class 觸發 */
+        :root.dark {
+            /* 🌑 現代科技黑：主要背景改成純黑／深黑灰色系，取代原本偏藍的深 slate 色階，
+               強調色（--accent 藍）保留，作為按鈕／連結／互動元素的少量亮色點綴 */
+            --bg-page: #0A0A0A;
+            --bg-card: #141414;
+            --bg-input: #1A1A1A;
+            --border: #262626;
+            --text-main: #FAFAFA;
+            --text-muted: #A3A3A3;
+            --accent: #3B82F6;
+            --accent-hover: #60A5FA;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --danger: #F87171;
+
+            --glass-bg: rgba(10, 10, 10, 0.7);
+            --glass-border: rgba(38, 38, 38, 0.6);
+            --overlay-bg: rgba(0, 0, 0, 0.6);
+            --hover-tint: rgba(59, 130, 246, 0.12);
+            --active-tint: rgba(59, 130, 246, 0.16);
+            --card-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4);
+            --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+            --scrollbar-track: #0A0A0A;
+            --scrollbar-thumb: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+            border: 2px solid var(--scrollbar-track);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* ============== App 版面骨架（與 index.html 完全一致） ============== */
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 🌟 毛玻璃側邊欄 */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--glass-border);
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: var(--sidebar-shadow);
+            z-index: 200;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            box-sizing: border-box;
+        }
+
+        /* 面試進行中維持沉浸感：側邊欄預設收合，只留漢堡選單可以叫出來 */
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 150;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #sidebarToggle:hover {
+            background: var(--hover-tint) !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(0);
+            }
+            .sidebar.collapsed {
+                width: 260px;
+                transform: translateX(-100%);
+                padding: 32px 20px;
+            }
+        }
+
+        .menu-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover {
+            background: var(--hover-tint);
+            color: var(--text-main);
+        }
+
+        .menu-item.active {
+            background: var(--active-tint);
+            color: var(--accent);
+            border-left: 4px solid var(--accent);
+        }
+
+        .menu-item-group {
+            position: relative;
+        }
+
+        .menu-item-parent {
+            justify-content: space-between;
+        }
+
+        .submenu-arrow {
+            font-size: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .menu-item-group.open .submenu-arrow,
+        .menu-item-group:hover .submenu-arrow {
+            transform: rotate(180deg);
+        }
+
+        .submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .menu-item-group.open .submenu,
+        .menu-item-group:hover .submenu {
+            max-height: 160px;
+        }
+
+        .submenu-item {
+            padding: 10px 16px 10px 32px;
+            margin-top: 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .submenu-item:hover {
+            background: var(--hover-tint);
+            color: var(--text-main);
+        }
+
+        .submenu-item.active {
+            background: var(--active-tint);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .main-content {
+            width: 100%;
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            /* header 改成 position:fixed 後不再佔文件流空間，這裡補回等高的上邊距，
+               避免內容被固定 header 蓋住（本頁面本身不捲動，只有內部聊天紀錄會捲動） */
+            padding-top: 96px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        /* 🌟 Edge-to-Edge：header 固定滿版於視窗頂端（見 shared-header.js），高度統一為 72px，
+           全站 8 個頁面都用同一組數值，搭配 .main-content 的 padding-top: 96px 補回空間 */
+        header {
+            width: 100%;
+            max-width: 100%;
+            height: 72px;
+            padding: 0 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        /* ============== 面試戰場核心 UI ============== */
+        .arena-container {
+            width: 100%;
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 0 24px 24px;
+            box-sizing: border-box;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .arena-progress {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+
+        .arena-progress-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .arena-progress-track {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 100px;
+            overflow: hidden;
+        }
+
+        .arena-progress-fill {
+            height: 100%;
+            background: var(--accent);
+            box-shadow: none;
+            border-radius: 100px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+
+        .arena-meta {
+            font-size: 13px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* 上方：AI 對話泡泡區 */
+        .arena-chat-log {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            background: var(--bg-card);
+            border: none;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--card-shadow);
+            padding: 24px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .msg-block {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 80%;
+        }
+
+        .msg-block.ai {
+            align-self: flex-start;
+        }
+
+        .msg-block.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .msg-sender {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-family: monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .ai-text {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            padding: 14px 18px;
+            border-radius: 18px 18px 18px 4px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-main);
+        }
+
+        .user-text {
+            background: var(--accent);
+            border: none;
+            padding: 14px 18px;
+            border-radius: 18px 18px 4px 18px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: white;
+        }
+
+        .system-text {
+            align-self: center;
+            font-size: 13px;
+            color: var(--accent);
+            font-family: monospace;
+            background: var(--hover-tint);
+            padding: 6px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--active-tint);
+        }
+
+        .system-text.error {
+            color: var(--danger);
+            background: rgba(220, 38, 38, 0.08);
+            border-color: rgba(220, 38, 38, 0.25);
+        }
+
+        .system-text .retry-report-btn {
+            margin-left: 10px;
+            padding: 4px 12px;
+            border-radius: 100px;
+            border: 1px solid currentColor;
+            background: transparent;
+            color: inherit;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* 🔔 錯誤/狀態 Toast：固定在右下角，確保 API 失敗時使用者一定看得到，不會畫面死當 */
+        .arena-toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            max-width: 360px;
+            background: #141414;
+            color: #FAFAFA;
+            padding: 14px 20px;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.5;
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            transform: translateY(20px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+        }
+
+        .arena-toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .arena-toast.toast-error {
+            background: #7F1D1D;
+        }
+
+        .arena-toast .toast-icon {
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .arena-toast.toast-error .toast-icon {
+            color: #FCA5A5;
+        }
+
+        .arena-toast:not(.toast-error) .toast-icon {
+            color: #34D399;
+        }
+
+        /* 下方：回答輸入區 */
+        .arena-answer-area {
+            flex-shrink: 0;
+            background: var(--bg-card);
+            border: none;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .answer-input-wrapper {
+            position: relative;
+        }
+
+        #answerInput {
+            width: 100%;
+            min-height: 110px;
+            padding: 16px;
+            padding-right: 56px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.6;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        #answerInput:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        #answerInput:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 🎙️ 語音輸入按鈕：預設狀態是靜態灰色麥克風圖示，錄音中變紅並帶呼吸燈動畫，
+           讓使用者不用盯著文字才知道現在有沒有在收音 */
+        .mic-btn {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+
+        .mic-btn:hover:not(:disabled) {
+            color: var(--text-main);
+            background: var(--hover-tint);
+        }
+
+        .mic-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .mic-btn.listening {
+            color: var(--danger);
+            animation: micPulse 1.4s ease-in-out infinite;
+        }
+
+        @keyframes micPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+
+        .arena-answer-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            gap: 16px;
+        }
+
+        #arenaStatusText {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        #submitAnswerBtn {
+            padding: 14px 32px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        #submitAnswerBtn:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        #submitAnswerBtn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-layout">
+
+        <div id="appSidebar" data-active="interview"></div>
+        <script src="./../js/shared-sidebar.js"></script>
+
+        <div class="main-content">
+
+            <div id="appHeader"></div>
+            <script src="./../js/shared-header.js"></script>
+
+            <div class="arena-container">
+                <div class="arena-progress">
+                    <span class="arena-progress-label">Question <span id="arenaQuestionIndex">1</span> of <span id="arenaQuestionTotal">-</span></span>
+                    <div class="arena-progress-track">
+                        <div class="arena-progress-fill" id="arenaProgressFill"></div>
+                    </div>
+                    <span class="arena-meta" id="arenaRoleMeta"></span>
+                </div>
+
+                <div class="arena-chat-log" id="arenaChatLog">
+                    <!-- 由 interview.js 動態產生 AI / USER 對話泡泡 -->
+                </div>
+
+                <div class="arena-answer-area">
+                    <div class="answer-input-wrapper">
+                        <textarea id="answerInput" placeholder="請輸入你的回答...（Enter 送出，Shift+Enter 換行）" disabled></textarea>
+                        <button id="micBtn" type="button" class="mic-btn" onclick="toggleSpeechRecognition()" disabled title="語音輸入">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="arena-answer-footer">
+                        <span id="arenaStatusText">正在連接 AI 面試官...</span>
+                        <button id="submitAnswerBtn" onclick="submitAnswer()" disabled>送出回答 Submit Answer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="aiPlayer" style="display: none;"></audio>
+    <div id="arenaToast" class="arena-toast"></div>
+
+    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script src="./../js/calender.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar) return;
+            sidebar.classList.toggle('collapsed');
+            const isOpen = !sidebar.classList.contains('collapsed');
+            if (overlay) overlay.classList.toggle('hidden', !isOpen);
+        }
+
+        // 智慧區塊切換與路由邏輯：本頁是獨立頁面，其餘功能一律跳轉過去
+        function switchFeature(featureName) {
+            const BASE_PATH = '';
+
+            if (featureName === 'interview') {
+                window.location.href = `${BASE_PATH}/index.html`;
+                return;
+            }
+            if (featureName === 'jd') {
+                window.location.href = `${BASE_PATH}/index.html?feature=jd`;
+                return;
+            }
+            if (featureName === 'dashboard') {
+                window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                return;
+            }
+            if (featureName === 'resume-records') {
+                window.location.href = `${BASE_PATH}/frontend/pages/resume_records.html`;
+                return;
+            }
+            if (featureName === 'calendar') {
+                window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                return;
+            }
+            if (featureName === 'consultant') {
+                window.location.href = `${BASE_PATH}/frontend/pages/consultant.html`;
+                return;
+            }
+            if (featureName === 'settings') {
+                window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                return;
+            }
+
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar && !sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+            if (overlay && !overlay.classList.contains('hidden')) overlay.classList.add('hidden');
+        }
+
+        function escapeHtml(value = "") {
+            return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+    <script src="./../js/interview.js"></script>
+</body>
+
+</html>

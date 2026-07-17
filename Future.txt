@@ -25,3 +25,10 @@
 面試進度看板 (Kanban Board)： 整合一個類似 Trello 的看板（已投遞、一面、二面、收到 Offer、拒絕），每一張卡片點開來，就直接連結到他在該公司做過的 AI 模擬面試紀錄。
 
 動態跟進信件生成器 (Follow-up Mail Generator)： 面試結束後，一鍵根據剛剛面試的實際對話內容（例如面試官提到的團隊痛點），利用 LLM 自動生成客製化的「感謝信 (Thank-you Note)」或「詢問進度信」，維持高度專業感。
+
+
+>> cd /d D:\文件\桌面\Coding\side_proj\interview_AI
+
+D:\文件\桌面\Coding\side_proj\interview_AI\backend> uvicorn main:app --reload
+>> python -m http.server 5500
+

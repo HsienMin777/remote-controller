@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="./../js/theme-init.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>履歷上傳紀錄</title>
+    <style>
+        /* 🌟 Clean B2B / Fintech 風格（與 index.html / calendar.html 完全一致的設計變數） */
+        :root {
+            --bg-page: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --border: #E2E8F0;
+            --text-main: #0F172A;
+            --text-muted: #475569;
+            --accent: #1E3A8A;
+            --accent-hover: #1E40AF;
+            --accent-glow: rgba(30, 58, 138, 0.14);
+            --danger: #DC2626;
+            --radius-lg: 1.25rem;
+            --radius-md: 0.75rem;
+            --radius-sm: 0.5rem;
+
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(226, 232, 240, 0.6);
+            --overlay-bg: rgba(15, 23, 42, 0.15);
+            --hover-tint: rgba(30, 58, 138, 0.06);
+            --active-tint: rgba(30, 58, 138, 0.08);
+            --card-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.1), 0 4px 16px rgba(15, 23, 42, 0.04);
+            --sidebar-shadow: 4px 0 24px rgba(15, 23, 42, 0.05);
+            --scrollbar-track: #F1F5F9;
+            --scrollbar-thumb: #CBD5E1;
+        }
+
+        /* 🌙 暗色模式：由 theme-init.js 在 <html> 加上 .dark class 觸發 */
+        :root.dark {
+            /* 🌑 現代科技黑：主要背景改成純黑／深黑灰色系，取代原本偏藍的深 slate 色階，
+               強調色（--accent 藍）保留，作為按鈕／連結／互動元素的少量亮色點綴 */
+            --bg-page: #0A0A0A;
+            --bg-card: #141414;
+            --bg-input: #1A1A1A;
+            --border: #262626;
+            --text-main: #FAFAFA;
+            --text-muted: #A3A3A3;
+            --accent: #3B82F6;
+            --accent-hover: #60A5FA;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --danger: #F87171;
+
+            --glass-bg: rgba(10, 10, 10, 0.7);
+            --glass-border: rgba(38, 38, 38, 0.6);
+            --overlay-bg: rgba(0, 0, 0, 0.6);
+            --hover-tint: rgba(59, 130, 246, 0.12);
+            --active-tint: rgba(59, 130, 246, 0.16);
+            --card-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4);
+            --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+            --scrollbar-track: #0A0A0A;
+            --scrollbar-thumb: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        /* 卷軸樣式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+            border: 2px solid var(--scrollbar-track);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* ============== App 版面骨架（與 index.html 完全一致） ============== */
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 🌟 毛玻璃側邊欄 */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--glass-border);
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: var(--sidebar-shadow);
+            z-index: 200;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 150;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #sidebarToggle:hover {
+            background: var(--hover-tint) !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(0);
+            }
+            .sidebar.collapsed {
+                width: 260px;
+                transform: translateX(-100%);
+                padding: 32px 20px;
+            }
+        }
+
+        .menu-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover {
+            background: var(--hover-tint);
+            color: var(--text-main);
+        }
+
+        .menu-item.active {
+            background: var(--active-tint);
+            color: var(--accent);
+            border-left: 4px solid var(--accent);
+        }
+
+        /* ============== 側邊欄二級選單（面試數據儀表板 → 面試紀錄／履歷上傳紀錄） ============== */
+        .menu-item-group {
+            position: relative;
+        }
+
+        .menu-item-parent {
+            justify-content: space-between;
+        }
+
+        .submenu-arrow {
+            font-size: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .menu-item-group.open .submenu-arrow,
+        .menu-item-group:hover .submenu-arrow {
+            transform: rotate(180deg);
+        }
+
+        .submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .menu-item-group.open .submenu,
+        .menu-item-group:hover .submenu {
+            max-height: 160px;
+        }
+
+        .submenu-item {
+            padding: 10px 16px 10px 32px;
+            margin-top: 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .submenu-item:hover {
+            background: var(--hover-tint);
+            color: var(--text-main);
+        }
+
+        .submenu-item.active {
+            background: var(--active-tint);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .main-content {
+            width: 100%;
+            flex: 1;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            /* header 改成 position:fixed 後不再佔文件流空間，這裡補回等高的上邊距，
+               避免內容被固定 header 蓋住 */
+            padding-top: 96px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        /* 🌟 Edge-to-Edge：header 固定滿版於視窗頂端（見 shared-header.js），高度統一為 72px，
+           全站 8 個頁面都用同一組數值，搭配 .main-content 的 padding-top: 96px 補回空間 */
+        header {
+            width: 100%;
+            max-width: 100%;
+            height: 72px;
+            padding: 0 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 0 24px 80px;
+            box-sizing: border-box;
+        }
+
+        /* Hero 標題 */
+        .hero {
+            max-width: 800px;
+            margin: 0 auto 24px;
+            text-align: left;
+            padding: 0 0 20px 0;
+            box-sizing: border-box;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 0 0 16px 0;
+            line-height: 1.1;
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin: 0;
+            font-weight: 400;
+            letter-spacing: 0.05em;
+        }
+
+        /* 🌟 卡片：純白背景 + 柔和大範圍陰影 */
+        .setup-card {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: var(--bg-card);
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            border: none;
+            box-shadow: var(--card-shadow);
+            box-sizing: border-box;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .card-header h3 {
+            margin: 0 0 4px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .record-item {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .record-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .record-score-badge {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--accent);
+            background: var(--hover-tint);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 6px 16px;
+        }
+
+        /* 契合度診斷細節（重用 JD 頁面的樣式） */
+        .skill-pill {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .skill-pill.match {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .skill-pill.miss {
+            background: rgba(220, 38, 38, 0.08);
+            color: var(--danger);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+        }
+
+        .revision-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .revision-before {
+            color: var(--danger);
+            font-size: 14px;
+            text-decoration: line-through;
+            opacity: 0.8;
+        }
+
+        .revision-after {
+            color: #059669;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .question-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-left: 3px solid #7C3AED;
+            border-radius: 4px 8px 8px 4px;
+            padding: 12px 16px;
+        }
+
+        .q-title {
+            color: var(--text-main);
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .q-intent {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* 彈出視窗樣式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 760px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: none;
+            box-shadow: var(--card-shadow);
+            box-sizing: border-box;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+        }
+        .btn-outline:hover {
+            background: var(--bg-input);
+        }
+
+        /* ============== 頁尾 Contact Us（橫軸版，與 index.html 完全一致） ============== */
+        .site-footer {
+            width: 100%;
+            border-top: 1px solid var(--border);
+            background: transparent;
+            margin-top: auto;
+        }
+
+        .footer-inner {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 48px 24px 24px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 48px;
+            flex-wrap: wrap;
+        }
+
+        .footer-brand {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .footer-brand p {
+            margin: 12px 0 0;
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 320px;
+        }
+
+        .footer-contact {
+            flex: 1.4;
+            min-width: 280px;
+        }
+
+        .footer-contact h3 {
+            margin: 0 0 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-contact-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .footer-contact-item {
+            display: flex;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a.footer-contact-item:hover {
+            color: var(--accent);
+        }
+
+        .footer-contact-label {
+            min-width: 52px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-top: 2px;
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-social a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .footer-social a:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 16px 24px 32px;
+            box-sizing: border-box;
+            color: var(--text-muted);
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .footer-inner {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-layout">
+
+        <div id="appSidebar" data-active="resume-records"></div>
+        <script src="./../js/shared-sidebar.js"></script>
+
+        <div class="main-content">
+
+            <div id="appHeader"></div>
+            <script src="./../js/shared-header.js"></script>
+
+            <div class="container">
+                <div class="hero">
+                    <h1>履歷上傳紀錄</h1>
+                    <p>檢視過去每一次「履歷與 JD 契合度診斷」的完整結果</p>
+                </div>
+
+                <div class="setup-card">
+                    <div class="card-header">
+                        <h3>診斷歷史</h3>
+                    </div>
+                    <div id="resumeRecordsList" style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- 由 JS 動態產生列表 -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="appFooter"></div>
+            <script src="./../js/shared-footer.js"></script>
+        </div>
+    </div>
+
+    <!-- 診斷詳情彈出視窗 -->
+    <div id="resumeDiagnosisModal" class="modal-overlay">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                <div>
+                    <h2 id="modalJobTitle" style="margin: 0 0 4px 0; color: var(--text-main);"></h2>
+                    <div id="modalMeta" style="color: var(--text-muted); font-size: 13px;"></div>
+                </div>
+                <button type="button" class="btn btn-outline" onclick="closeResumeDiagnosisModal()">關閉</button>
+            </div>
+            <div id="modalBody" style="display: flex; flex-direction: column; gap: 24px;"></div>
+        </div>
+    </div>
+
+    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script src="./../js/calender.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar) return;
+            sidebar.classList.toggle('collapsed');
+            const isOpen = !sidebar.classList.contains('collapsed');
+            if (overlay) overlay.classList.toggle('hidden', !isOpen);
+        }
+
+        // 智慧區塊切換與路由邏輯：本頁本身就是獨立頁面，其餘功能一律跳轉過去
+        function switchFeature(featureName) {
+            const BASE_PATH = '';
+
+            if (featureName === 'interview' || featureName === 'jd') {
+                window.location.href = `${BASE_PATH}/index.html?feature=${featureName}`;
+                return;
+            }
+            if (featureName === 'dashboard') {
+                window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                return;
+            }
+            if (featureName === 'calendar') {
+                window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                return;
+            }
+            if (featureName === 'consultant') {
+                window.location.href = `${BASE_PATH}/frontend/pages/consultant.html`;
+                return;
+            }
+            if (featureName === 'settings') {
+                window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                return;
+            }
+
+            // featureName === 'resume-records'：已經在本頁，只需收合側邊欄
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar && !sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+            if (overlay && !overlay.classList.contains('hidden')) overlay.classList.add('hidden');
+        }
+
+        function escapeHtml(value = "") {
+            return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+    <script src="./../js/resume_records.js"></script>
+</body>
+
+</html>

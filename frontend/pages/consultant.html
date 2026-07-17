@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="./../js/theme-init.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 面試諮詢室</title>
+    <style>
+        /* 🌟 Clean B2B / Fintech 風格（與 index.html / calendar.html 完全一致的設計變數） */
+        :root {
+            --bg-page: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --border: #E2E8F0;
+            --text-main: #0F172A;
+            --text-muted: #475569;
+            --accent: #1E3A8A;
+            --accent-hover: #1E40AF;
+            --accent-glow: rgba(30, 58, 138, 0.14);
+            --danger: #DC2626;
+            --radius-lg: 1.25rem;
+            --radius-md: 0.75rem;
+            --radius-sm: 0.5rem;
+
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(226, 232, 240, 0.6);
+            --overlay-bg: rgba(15, 23, 42, 0.15);
+            --hover-tint: rgba(30, 58, 138, 0.06);
+            --active-tint: rgba(30, 58, 138, 0.08);
+            --card-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.1), 0 4px 16px rgba(15, 23, 42, 0.04);
+            --sidebar-shadow: 4px 0 24px rgba(15, 23, 42, 0.05);
+            --scrollbar-track: #F1F5F9;
+            --scrollbar-thumb: #CBD5E1;
+        }
+
+        /* 🌙 暗色模式：由 theme-init.js 在 <html> 加上 .dark class 觸發 */
+        :root.dark {
+            /* 🌑 現代科技黑：主要背景改成純黑／深黑灰色系，取代原本偏藍的深 slate 色階，
+               強調色（--accent 藍）保留，作為按鈕／連結／互動元素的少量亮色點綴 */
+            --bg-page: #0A0A0A;
+            --bg-card: #141414;
+            --bg-input: #1A1A1A;
+            --border: #262626;
+            --text-main: #FAFAFA;
+            --text-muted: #A3A3A3;
+            --accent: #3B82F6;
+            --accent-hover: #60A5FA;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --danger: #F87171;
+
+            --glass-bg: rgba(10, 10, 10, 0.7);
+            --glass-border: rgba(38, 38, 38, 0.6);
+            --overlay-bg: rgba(0, 0, 0, 0.6);
+            --hover-tint: rgba(59, 130, 246, 0.12);
+            --active-tint: rgba(59, 130, 246, 0.16);
+            --card-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4);
+            --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+            --scrollbar-track: #0A0A0A;
+            --scrollbar-thumb: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+            border: 2px solid var(--scrollbar-track);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* ============== App 版面骨架（與 index.html 完全一致） ============== */
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 🌟 毛玻璃側邊欄 */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--glass-border);
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: var(--sidebar-shadow);
+            z-index: 200;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 150;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #sidebarToggle:hover {
+            background: var(--hover-tint) !important;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(0);
+            }
+            .sidebar.collapsed {
+                width: 260px;
+                transform: translateX(-100%);
+                padding: 32px 20px;
+            }
+        }
+
+        .menu-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover {
+            background: var(--hover-tint);
+            color: var(--text-main);
+        }
+
+        .menu-item.active {
+            background: var(--active-tint);
+            color: var(--accent);
+            border-left: 4px solid var(--accent);
+        }
+
+        .menu-item-group {
+            position: relative;
+        }
+
+        .menu-item-parent {
+            justify-content: space-between;
+        }
+
+        .submenu-arrow {
+            font-size: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .menu-item-group.open .submenu-arrow,
+        .menu-item-group:hover .submenu-arrow {
+            transform: rotate(180deg);
+        }
+
+        .submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .menu-item-group.open .submenu,
+        .menu-item-group:hover .submenu {
+            max-height: 160px;
+        }
+
+        .submenu-item {
+            padding: 10px 16px 10px 32px;
+            margin-top: 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .submenu-item:hover {
+            background: var(--hover-tint);
+            color: var(--text-main);
+        }
+
+        .submenu-item.active {
+            background: var(--active-tint);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .main-content {
+            width: 100%;
+            flex: 1;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            /* header 改成 position:fixed 後不再佔文件流空間，這裡補回等高的上邊距，
+               避免內容被固定 header 蓋住 */
+            padding-top: 96px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        /* 🌟 Edge-to-Edge：header 固定滿版於視窗頂端（見 shared-header.js），高度統一為 72px，
+           全站 8 個頁面都用同一組數值，搭配 .main-content 的 padding-top: 96px 補回空間 */
+        header {
+            width: 100%;
+            max-width: 100%;
+            height: 72px;
+            padding: 0 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        /* ============== 諮詢室核心 UI ============== */
+        .consultant-container {
+            width: 100%;
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 0 24px 24px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .consultant-header {
+            flex-shrink: 0;
+            margin-bottom: 16px;
+        }
+
+        .consultant-header h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .consultant-header p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        /* 快速提問標籤 */
+        /* 無限循環跑馬燈：外層裁切 + 內層軌道位移動畫 */
+        .ticker-wrapper {
+            overflow: hidden;
+            width: 100%;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%);
+        }
+
+        .ticker-track {
+            display: flex;
+            width: max-content;
+            gap: 10px;
+            animation: ticker-scroll 72s linear infinite;
+        }
+
+        /* 關鍵 UX：滑鼠移入時暫停動畫，方便閱讀與點擊 */
+        .ticker-wrapper:hover .ticker-track {
+            animation-play-state: paused;
+        }
+
+        @keyframes ticker-scroll {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(-50%);
+            }
+        }
+
+        .quick-chip {
+            flex-shrink: 0;
+            padding: 8px 16px;
+            border-radius: 100px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .quick-chip:hover {
+            background: var(--hover-tint);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .consultant-chat-log {
+            /* 🌟 顯示結果移到輸入框下方，並把高度放大 3 倍，讓對話紀錄更醒目好讀 */
+            height: 600px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            background: var(--bg-card);
+            border: none;
+            box-shadow: var(--card-shadow);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .msg-block {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 80%;
+        }
+
+        .msg-block.ai {
+            align-self: flex-start;
+        }
+
+        .msg-block.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .msg-sender {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-family: monospace;
+            letter-spacing: 0.05em;
+        }
+
+        .ai-text {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 14px 18px;
+            border-radius: 18px 18px 18px 4px;
+            font-size: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .user-text {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 14px 18px;
+            border-radius: 18px 18px 4px 18px;
+            font-size: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .system-text {
+            align-self: center;
+            font-size: 13px;
+            color: var(--accent);
+            font-family: monospace;
+            background: var(--hover-tint);
+            padding: 6px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--active-tint);
+        }
+
+        .system-text.error {
+            color: var(--danger);
+            background: rgba(220, 38, 38, 0.06);
+            border-color: rgba(220, 38, 38, 0.2);
+        }
+
+        /* 輸入區 */
+        .consultant-input-area {
+            flex-shrink: 0;
+            background: var(--bg-card);
+            border: none;
+            box-shadow: var(--card-shadow);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #consultantInput {
+            width: 100%;
+            min-height: 80px;
+            padding: 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.6;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        #consultantInput:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        #consultantInput:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .consultant-input-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            gap: 16px;
+        }
+
+        .consultant-quota-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        #consultantQuotaText {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        #consultantQuotaText.exhausted {
+            color: var(--danger);
+        }
+
+        #consultantCharCount {
+            font-family: monospace;
+        }
+
+        #consultantCharCount.over-limit {
+            color: var(--danger);
+        }
+
+        #sendConsultantBtn {
+            padding: 14px 32px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        #sendConsultantBtn:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        #sendConsultantBtn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* ============== 頁尾 Contact Us（橫軸版，與 index.html 完全一致） ============== */
+        .site-footer {
+            width: 100%;
+            border-top: 1px solid var(--border);
+            background: transparent;
+            margin-top: auto;
+        }
+
+        .footer-inner {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 48px 24px 24px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 48px;
+            flex-wrap: wrap;
+        }
+
+        .footer-brand {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .footer-brand p {
+            margin: 12px 0 0;
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 320px;
+        }
+
+        .footer-contact {
+            flex: 1.4;
+            min-width: 280px;
+        }
+
+        .footer-contact h3 {
+            margin: 0 0 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-contact-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .footer-contact-item {
+            display: flex;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a.footer-contact-item:hover {
+            color: var(--accent);
+        }
+
+        .footer-contact-label {
+            min-width: 52px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-top: 2px;
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-social a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .footer-social a:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 16px 24px 32px;
+            box-sizing: border-box;
+            color: var(--text-muted);
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .footer-inner {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-layout">
+
+        <div id="appSidebar" data-active="consultant"></div>
+        <script src="./../js/shared-sidebar.js"></script>
+
+        <div class="main-content">
+
+            <div id="appHeader"></div>
+            <script src="./../js/shared-header.js"></script>
+
+            <div class="consultant-container">
+                <div class="consultant-header">
+                    <h1>AI 面試諮詢室</h1>
+                    <p>針對面試、履歷與職涯發展的疑難雜症，隨時向專屬 AI 諮詢師提問</p>
+                </div>
+
+                <div class="ticker-wrapper" id="tickerWrapper">
+                    <div class="ticker-track" id="tickerTrack">
+                        <!-- 由 consultant.js 動態產生 15 題 x 2 份的無縫循環 chips -->
+                    </div>
+                </div>
+
+                <div class="consultant-input-area">
+                    <textarea id="consultantInput" placeholder="輸入你的問題（最多 500 字）..." disabled></textarea>
+                    <div class="consultant-input-footer">
+                        <div class="consultant-quota-row">
+                            <span>今日剩餘諮詢次數：<span id="consultantQuotaText">- / 5</span></span>
+                            <span id="consultantCharCount">0 / 500</span>
+                        </div>
+                        <button id="sendConsultantBtn" onclick="sendConsultantMessage()" disabled>送出提問</button>
+                    </div>
+                </div>
+
+                <div class="consultant-chat-log" id="consultantChatLog">
+                    <div class="system-text">歡迎來到 AI 面試諮詢室，點擊上方標籤或直接輸入你的問題吧！</div>
+                </div>
+            </div>
+
+            <div id="appFooter"></div>
+            <script src="./../js/shared-footer.js"></script>
+        </div>
+    </div>
+
+    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script src="./../js/calender.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar) return;
+            sidebar.classList.toggle('collapsed');
+            const isOpen = !sidebar.classList.contains('collapsed');
+            if (overlay) overlay.classList.toggle('hidden', !isOpen);
+        }
+
+        // 智慧區塊切換與路由邏輯：本頁是獨立頁面，其餘功能一律跳轉過去
+        function switchFeature(featureName) {
+            const BASE_PATH = '';
+
+            if (featureName === 'interview') {
+                window.location.href = `${BASE_PATH}/index.html`;
+                return;
+            }
+            if (featureName === 'jd') {
+                window.location.href = `${BASE_PATH}/index.html?feature=jd`;
+                return;
+            }
+            if (featureName === 'dashboard') {
+                window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                return;
+            }
+            if (featureName === 'resume-records') {
+                window.location.href = `${BASE_PATH}/frontend/pages/resume_records.html`;
+                return;
+            }
+            if (featureName === 'calendar') {
+                window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                return;
+            }
+            if (featureName === 'settings') {
+                window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                return;
+            }
+
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar && !sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+            if (overlay && !overlay.classList.contains('hidden')) overlay.classList.add('hidden');
+        }
+
+        function escapeHtml(value = "") {
+            return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+    <script src="./../js/consultant.js"></script>
+</body>
+
+</html>

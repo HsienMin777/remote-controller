@@ -1,69 +1,86 @@
 import os
 import json
 import base64
+import mimetypes
 from datetime import datetime
 from io import BytesIO
 from typing import Optional
 
+# 🔥 Windows 的登錄檔常把 .js 對應到 text/plain，導致靜態檔案被送錯 MIME type，
+#    這裡強制覆寫成正確的 JavaScript MIME type。
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
+from api.calender_api import router as calendar_router, get_current_user_id, send_email, ScheduleModel
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import PyPDF2
-from dotenv import load_dotenv
-
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 # SQLAlchemy 相關套件
-from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, inspect, text
+from sqlalchemy.orm import declarative_base, Session
 
-# 外部 API 客戶端
-from openai import AsyncOpenAI
-from supabase import create_client, Client
-
+# 共用的 DB engine / OpenAI client / Supabase client（見 db_clients.py 的說明）
+from db_clients import aclient, supabase_client, engine, SessionLocal, get_db
 # ==========================================
 # 0. 環境變數與靜態常數設定
 # ==========================================
 
-
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-# 加上防呆機制，如果在本地端忘記設定 .env，伺服器啟動時會提早報錯
-if not all([DATABASE_URL, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY]):
-    raise ValueError("環境變數缺失！請確認根目錄下有 .env 檔案，並填妥所有金鑰。")
-
-# 初始化非同步的 OpenAI 客戶端與 Supabase
-aclient = AsyncOpenAI(api_key=OPENAI_API_KEY)
-supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class InterviewRecord(Base):
     __tablename__ = "interview_records"
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True)  # 紀錄屬於哪位登入使用者
     job_title = Column(String, index=True)
     company_name = Column(String)
     date = Column(DateTime, default=datetime.utcnow)
     total_score = Column(Integer)
     short_feedback = Column(String)
     detailed_scores = Column(JSON)
-    strengths = Column(JSON)      
+    strengths = Column(JSON)
     improvements = Column(JSON)
-    transcript = Column(JSON)
+    transcript = Column(JSON, nullable=True)
     resume_url = Column(String, nullable=True)
+    opportunities = Column(JSON, nullable=True)  # 「能力升級區」翻盤任務的生成/完成結果
+
+class ResumeDiagnosis(Base):
+    __tablename__ = "resume_diagnoses"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True, nullable=True)  # 紀錄屬於哪位登入使用者
+    job_title = Column(String, index=True)
+    company_name = Column(String)
+    date = Column(DateTime, default=datetime.utcnow)
+    resume_text = Column(Text)
+    jd_text = Column(Text)
+    match_score = Column(Integer)
+    diagnosis_result = Column(JSON)  # AI 產出的完整診斷 JSON (summary / matched_skills / missing_skills / resume_tips / predicted_questions / advice)
+
+class ConsultantChatLog(Base):
+    __tablename__ = "consultant_chat_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True)  # 紀錄屬於哪位登入使用者，同時用來計算每日額度
+    message = Column(Text)
+    reply = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# 🔥 interview_records 資料表在加入 user_id / transcript / opportunities 前就已存在，
+#    create_all 不會幫舊表補欄位，這裡用 ALTER TABLE 補齊，確保既有資料庫升級後不會噴 column does not exist。
+def _ensure_interview_record_columns():
+    inspector = inspect(engine)
+    columns = [col["name"] for col in inspector.get_columns("interview_records")]
+    with engine.begin() as conn:
+        if "user_id" not in columns:
+            conn.execute(text("ALTER TABLE interview_records ADD COLUMN user_id VARCHAR"))
+        if "transcript" not in columns:
+            conn.execute(text("ALTER TABLE interview_records ADD COLUMN transcript JSON"))
+        if "opportunities" not in columns:
+            conn.execute(text("ALTER TABLE interview_records ADD COLUMN opportunities JSON"))
+
+_ensure_interview_record_columns()
 
 # ==========================================
 # 2. 資料模型與工具函數
@@ -76,11 +93,39 @@ class SaveRecordRequest(BaseModel):
     detailed_scores: dict
     strengths: list
     improvements: list
-    transcript: list 
+    transcript: list
     resumeUrl: Optional[str] = None
-    transcript: list 
-    resumeUrl: Optional[str] = None
-    diagnostic: dict
+    # diagnostic 只用於前端觸發「復仇翻盤任務」，資料庫不儲存，
+    # 所以設為選填，避免 AI report 偶爾漏產生這個欄位時擋掉整筆儲存
+    diagnostic: Optional[dict] = None
+    # 「能力升級區」在即時報告頁面已生成（或使用者已完成）的翻盤任務，隨面試紀錄一併存檔
+    opportunities: Optional[list] = None
+
+class UpdateOpportunitiesRequest(BaseModel):
+    opportunities: list
+
+class ContactRequest(BaseModel):
+    name: str
+    email: str
+    message: str
+
+class SaveResumeDiagnosisRequest(BaseModel):
+    job_title: str
+    company_name: str
+    resume_text: str
+    jd_text: str
+    match_score: int
+    diagnosis_result: dict
+
+class ConsultantChatRequest(BaseModel):
+    message: str
+
+# AI 面試諮詢室的成本防護參數：每日次數上限、單則訊息字數上限
+CONSULTANT_DAILY_LIMIT = 5
+CONSULTANT_MAX_CHARS = 500
+
+# 網站經營者收信信箱，聯絡我們表單一律寄到這裡
+CONTACT_RECEIVER_EMAIL = "bbei8640@gmail.com"
 
 def extract_text_from_pdf(file_bytes):
     try:
@@ -103,6 +148,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(calendar_router, prefix="/api", tags=["Calendar"])
+# ==========================================
+
 # ==========================================
 # 4. 核心路由區：面試主流程
 # ==========================================
@@ -117,7 +165,8 @@ async def next_question(
     resume_file: UploadFile = File(None),
     text_answer: Optional[str] = Form(None),
     is_final_round: str = Form("false"),
-    interview_language: str = Form("zh") 
+    interview_language: str = Form("zh"),
+    job_description: Optional[str] = Form(None) # 由「一鍵備戰」帶入的 JD，讓提問更貼合職缺
 ):
     chat_history = json.loads(chat_history_str)
     
@@ -131,7 +180,7 @@ async def next_question(
         "medium": """
 - 難度設定：中級 (Mid-level/Standard)
 - 語氣：專業、務實、標準面試官。
-- 提問風格：要求使用 STAR 原則回答。針對履歷或專案細節進行 1~2 層的追問。
+- 提問風格：請以自然的口吻，引導求職者具體說明「當時的專案背景、遇到的最大困難、具體採取的技術行動，以及最終的量化成果。
 - 追問深度：如果對方給出模糊的形容詞（如「效能變好」），必須追問具體數據或實作細節。""",
         "hard": """
 - 難度設定：高級 (Senior/Advanced/Stress Interview)
@@ -169,7 +218,10 @@ async def next_question(
         1. 第一輪：親切問好並請對方自我介紹。
         2. 後續互動：嚴格遵守難度設定的追問深度。靈活切換策略。
         """
-    
+
+    if job_description and job_description.strip():
+        DYNAMIC_SYSTEM_PROMPT += f"\n\n# 職缺描述 (JD) 參考資料\n請優先針對此 JD 提及的技能與職責來提問與追問：\n{job_description.strip()}"
+
     user_text = ""
     returned_resume_url = None
 
@@ -262,31 +314,32 @@ async def generate_report(
     REPORT_SYSTEM_PROMPT = f"""# Role
     {role_desc}
 
-    # 嚴格評分標準
-    1. 拒絕放水：回答極度簡短、文不對題，總分不得超過 40 分。
-    2. 絕不捏造優點：整場無建設性，優點請填 ["無明顯亮點"]。
-    3. 嚴格審視深度：無具體做法實例，該項不及格。
+    # 評分標準 (客觀與公平原則)
+    1. 基準評分：請客觀評估，表現平穩且有回答出基本架構，起跳分為 65-70 分。若回答中包含「具體實例」、「量化數據」或「深入的技術見解」，請大方給予 85-95 甚至更高分。
+    2. 扣分機制：只有在回答極度簡短、完全文不對題、或嚴重缺乏邏輯時，總分才給予不及格 (60 分以下)。
+    3. 實事求是：切勿過度嚴苛或捏造缺點。若表現優異，優點請具體列出；若整場毫無建設性，優點才填 ["無明顯亮點"]。
 
     # 核心弱點診斷 (Diagnostic Analysis)
-    請分析整場對話，並從以下四個標籤中，挑選出該求職者最嚴重的【一個】致命弱點：
+    請分析整場對話，挑選出該求職者最嚴重的【一個】弱點。若該求職者表現極度優異、邏輯清晰且對答如流，請選擇 "NONE"：
     - "LACK_OF_DATA"：缺乏量化與數據佐證 (回答空泛，只有形容詞沒有具體指標)
     - "LOGIC_UNCLEAR"：邏輯混亂與結構鬆散 (想到什麼講什麼，缺乏 STAR 架構)
     - "OFF_TOPIC"：答非所問與未抓重點 (沒有精準回答面試官的問題)
     - "TECHNICAL_GAP"：技術觀念薄弱 (專有名詞誤用或底層邏輯不清楚)
+    - "NONE"：表現優異，無明顯致命弱點 (總分達 85 分以上方可使用此標籤)
 
     請務必只輸出合法的 JSON 格式，結構必須完全符合以下定義：
     {{
         "total_score": 85,
-        "short_feedback": "一句總結",
+        "short_feedback": "一句客觀的總結評語",
         "detailed_scores": {metrics},
-        "strengths": ["優點1"],
-        "improvements": ["缺點1"],
-        "markdown_report": "完整報告內容",
+        "strengths": ["優點1", "優點2"],
+        "improvements": ["缺點1", "缺點2"],
+        "markdown_report": "完整且結構化的面試報告內容",
         "diagnostic": {{
-            "primary_weakness": "填入上述四個標籤之一",
-            "focus_question": "精確擷取：當時面試官問的那句話",
-            "worst_answer": "精確擷取：求職者回答中最差、最籠統的原話 (必須是原話)",
-            "weakness_context": "簡述為什麼判定這是弱點的具體原因分析"
+            "primary_weakness": "填入上述五個標籤之一",
+            "focus_question": "精確擷取：當時面試官問的那句話 (若標籤為 NONE，請填寫 '無')",
+            "worst_answer": "精確擷取：求職者回答中最差、最籠統的原話 (若標籤為 NONE，請填寫 '無')",
+            "weakness_context": "簡述為什麼判定這是弱點的具體原因分析，或判定無弱點的讚賞理由"
         }}
     }}
     """
@@ -364,7 +417,7 @@ JSON 格式如下：
         user_msg = f"公司：{company_name}\n職位：{job_title}\n\n【JD】\n{job_description}\n\n【履歷】\n{resume_text}"
 
         completion = await aclient.chat.completions.create(
-            model="gpt-4o-mini", # 建議使用 gpt-4o 以確保 JSON 格式輸出正確
+            model="gpt-4o", # 建議使用 gpt-4o 以確保 JSON 格式輸出正確
             response_format={ "type": "json_object" },
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -373,6 +426,11 @@ JSON 格式如下：
         )
         
         result = json.loads(completion.choices[0].message.content)
+        # 把履歷文字與職缺資訊一併帶回前端，供使用者確認儲存時打包送出
+        result["resume_text"] = resume_text
+        result["jd_text"] = job_description
+        result["job_title"] = job_title
+        result["company_name"] = company_name
         return result
 
     except Exception as e:
@@ -384,9 +442,14 @@ JSON 格式如下：
 # ==========================================
 
 @app.get("/api/interview/history")
-def get_interview_history(db: Session = Depends(get_db)):
+def get_interview_history(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     try:
-        records = db.query(InterviewRecord).order_by(InterviewRecord.date.desc()).all()
+        records = (
+            db.query(InterviewRecord)
+            .filter(InterviewRecord.user_id == user_id)
+            .order_by(InterviewRecord.date.desc())
+            .all()
+        )
         formatted_records = []
         for r in records:
             date_str = r.date.strftime("%Y-%m-%d") if r.date else datetime.utcnow().strftime("%Y-%m-%d")
@@ -400,15 +463,17 @@ def get_interview_history(db: Session = Depends(get_db)):
                 "strengths": getattr(r, "strengths", []) or [],
                 "improvements": getattr(r, "improvements", []) or [],
                 "transcript": getattr(r, "transcript", []) or [],
-                "resumeUrl": getattr(r, "resume_url", None)
+                "resumeUrl": getattr(r, "resume_url", None),
+                "opportunities": getattr(r, "opportunities", None)
             })
         return {"records": formatted_records}
     except Exception as e:
         return {"records": [], "error": str(e)}
 
 @app.post("/api/interview/save")
-def save_interview_record(req: SaveRecordRequest, db: Session = Depends(get_db)):
+def save_interview_record(req: SaveRecordRequest, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     new_record = InterviewRecord(
+        user_id=user_id,
         job_title=req.job_title,
         company_name=req.company_name,
         total_score=req.total_score,
@@ -417,11 +482,170 @@ def save_interview_record(req: SaveRecordRequest, db: Session = Depends(get_db))
         strengths=req.strengths,
         improvements=req.improvements,
         transcript=req.transcript,
-        resume_url=req.resumeUrl
+        resume_url=req.resumeUrl,
+        opportunities=req.opportunities
     )
     db.add(new_record)
     db.commit()
-    return {"status": "success", "message": "紀錄已成功儲存！"}
+    db.refresh(new_record)
+    return {"status": "success", "message": "紀錄已成功儲存！", "id": new_record.id}
+
+@app.put("/api/interview/{record_id}/opportunities")
+def update_interview_opportunities(record_id: int, req: UpdateOpportunitiesRequest, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    # 供「能力升級區」在歷史檢視頁完成翻盤任務時，把最新的 cleared 狀態存回這筆已存在的面試紀錄
+    record = (
+        db.query(InterviewRecord)
+        .filter(InterviewRecord.id == record_id, InterviewRecord.user_id == user_id)
+        .first()
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="找不到這筆面試紀錄")
+
+    record.opportunities = req.opportunities
+    db.commit()
+    return {"status": "success"}
+
+@app.post("/api/resume/save")
+def save_resume_diagnosis(req: SaveResumeDiagnosisRequest, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    new_record = ResumeDiagnosis(
+        user_id=user_id,
+        job_title=req.job_title,
+        company_name=req.company_name,
+        resume_text=req.resume_text,
+        jd_text=req.jd_text,
+        match_score=req.match_score,
+        diagnosis_result=req.diagnosis_result
+    )
+    db.add(new_record)
+    db.commit()
+    db.refresh(new_record)
+    return {"status": "success", "message": "診斷紀錄已成功儲存！", "id": new_record.id}
+
+@app.get("/api/resume/history")
+def get_resume_history(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    try:
+        records = (
+            db.query(ResumeDiagnosis)
+            .filter(ResumeDiagnosis.user_id == user_id)
+            .order_by(ResumeDiagnosis.date.desc())
+            .all()
+        )
+        formatted_records = []
+        for r in records:
+            date_str = r.date.strftime("%Y-%m-%d") if r.date else datetime.utcnow().strftime("%Y-%m-%d")
+            formatted_records.append({
+                "id": r.id,
+                "jobTitle": getattr(r, "job_title", "未定職缺") or "未定職缺",
+                "companyName": getattr(r, "company_name", "") or "",
+                "date": date_str,
+                "matchScore": getattr(r, "match_score", 0) or 0,
+                "resumeText": getattr(r, "resume_text", "") or "",
+                "jdText": getattr(r, "jd_text", "") or "",
+                "diagnosisResult": getattr(r, "diagnosis_result", {}) or {}
+            })
+        return {"records": formatted_records}
+    except Exception as e:
+        return {"records": [], "error": str(e)}
+
+# ==========================================
+# 6. AI 面試諮詢室 (Consultant) — 成本防護 + 背景上下文注入
+# ==========================================
+
+# 計算某位使用者「今天」(UTC) 已經發問幾次，作為每日額度依據
+def _get_consultant_usage_today(db: Session, user_id: str) -> int:
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    return (
+        db.query(ConsultantChatLog)
+        .filter(ConsultantChatLog.user_id == user_id, ConsultantChatLog.created_at >= today_start)
+        .count()
+    )
+
+# 查詢這位使用者最新的一筆面試排程或履歷診斷紀錄，組成給 AI 的背景資訊
+def _get_consultant_context(db: Session, user_id: str) -> str:
+    latest_schedule = (
+        db.query(ScheduleModel)
+        .filter(ScheduleModel.user_id == user_id)
+        .order_by(ScheduleModel.id.desc())
+        .first()
+    )
+    if latest_schedule:
+        return f"使用者目前有一場即將到來的面試：應徵【{latest_schedule.company}】的【{latest_schedule.job_title}】職位（面試日期：{latest_schedule.date}）。"
+
+    latest_resume = (
+        db.query(ResumeDiagnosis)
+        .filter(ResumeDiagnosis.user_id == user_id)
+        .order_by(ResumeDiagnosis.id.desc())
+        .first()
+    )
+    if latest_resume:
+        return f"使用者最近分析過應徵【{latest_resume.company_name}】的【{latest_resume.job_title}】職位的履歷與 JD 契合度（契合度分數：{latest_resume.match_score}%）。"
+
+    return "目前查無這位使用者的面試排程或履歷診斷紀錄，如有需要可請使用者補充應徵的職位與公司資訊。"
+
+@app.get("/api/consultant/quota")
+def get_consultant_quota(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    used_today = _get_consultant_usage_today(db, user_id)
+    remaining = max(0, CONSULTANT_DAILY_LIMIT - used_today)
+    return {"remaining_quota": remaining, "daily_limit": CONSULTANT_DAILY_LIMIT}
+
+@app.post("/api/consultant/chat")
+async def consultant_chat(req: ConsultantChatRequest, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    message = req.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="訊息不可為空")
+    # 🔥 字數防護：超過 500 字直接擋下，不呼叫 AI
+    if len(message) > CONSULTANT_MAX_CHARS:
+        raise HTTPException(status_code=400, detail=f"訊息長度不可超過 {CONSULTANT_MAX_CHARS} 字")
+
+    # 🔥 每日額度防護：查詢今日已使用次數，超過上限直接回 429，不呼叫 AI
+    used_today = _get_consultant_usage_today(db, user_id)
+    if used_today >= CONSULTANT_DAILY_LIMIT:
+        raise HTTPException(status_code=429, detail="今日諮詢次數已達上限，請明天再來！")
+
+    # 🔥 背景上下文注入：查詢使用者最新的面試排程或履歷診斷紀錄
+    context = _get_consultant_context(db, user_id)
+
+    SYSTEM_PROMPT = f"""你是 OfferDash 的專屬 AI 職涯諮詢師，專門協助使用者解決面試、履歷與職涯發展相關的疑難雜症。
+
+# 使用者背景資訊（後端自動查詢，請直接運用，不需要使用者重複輸入）
+{context}
+
+# 角色界線
+如果使用者的問題與面試、履歷、職涯發展無關（例如要求寫程式碼、翻譯文件、日常聊天或其他不相關主題），請禮貌拒絕回答，並引導使用者把問題聚焦回面試或職涯主題。
+
+# 防止功能重疊
+如果使用者要求「幫我修改整份履歷」或「開始模擬面試」這類完整功能請求，不要嘗試直接完成，請明確回覆：
+「請前往側邊欄的【履歷與 JD 契合度診斷】進行深入分析，或點擊【面試數據儀表板】準備開始模擬面試！」
+
+# 回答風格
+請用專業但親切的語氣，簡潔扼要地回答，控制在 200 字以內。"""
+
+    try:
+        completion = await aclient.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": message}
+            ]
+        )
+        reply = completion.choices[0].message.content
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI 諮詢失敗: {str(e)}")
+
+    # 寫入紀錄，同時也是計算下次額度的依據
+    log = ConsultantChatLog(user_id=user_id, message=message, reply=reply)
+    db.add(log)
+    db.commit()
+
+    remaining = max(0, CONSULTANT_DAILY_LIMIT - (used_today + 1))
+    return {"reply": reply, "remaining_quota": remaining, "daily_limit": CONSULTANT_DAILY_LIMIT}
+
+@app.post("/api/contact")
+def submit_contact(req: ContactRequest):
+    subject = f"[OfferDash 聯絡我們] 來自 {req.name}"
+    body = f"姓名：{req.name}\n回覆信箱：{req.email}\n\n訊息內容：\n{req.message}"
+    send_email(CONTACT_RECEIVER_EMAIL, subject, body)
+    return {"status": "success", "message": "訊息已送出，我們會盡快回覆您！"}
 
 @app.post("/api/growth/generate-redemption")
 async def generate_redemption(
@@ -477,7 +701,7 @@ async def generate_redemption(
 
         # 3. 呼叫 GPT-4o 生成結構化 JSON
         completion = await aclient.chat.completions.create(
-            model="gpt-4o-mini", # 建議使用 gpt-4o 確保 JSON 結構穩定
+            model="gpt-4o", # 建議使用 gpt-4o 確保 JSON 結構穩定
             response_format={ "type": "json_object" },
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -496,3 +720,23 @@ async def generate_redemption(
     except Exception as e:
         print(f"生成復仇局失敗: {str(e)}")
         return {"error": f"分析失敗: {str(e)}"}
+    
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+
+# index.html / login.html 位於專案根目錄 (不在 frontend/ 底下)，只個別開放這兩個檔案，
+# 避免把整個專案根目錄 (含 .env、backend 原始碼) 掛上網路。
+# 🔥 router.js 產生的網址是 "index.html?feature=xxx" (而非 "/")，重新整理或直接訪問該網址
+#    時瀏覽器會真的發出請求，所以 "/" 與 "/index.html" 都要對應到同一個檔案。
+@app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
+async def serve_home():
+    return FileResponse(os.path.join(BASE_DIR, "index.html"))
+
+@app.get("/login.html", include_in_schema=False)
+async def serve_login():
+    return FileResponse(os.path.join(BASE_DIR, "login.html"))
+
+# frontend/ 底下的靜態資源掛在 /frontend，對應 index.html/login.html 內
+# 「./frontend/js/xxx.js」與各分頁 (pages/*.html) 內「./../js/xxx.js」的相對路徑寫法。
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend-static")

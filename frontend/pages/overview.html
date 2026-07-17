@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="./../js/theme-init.js"></script>
+    <script src="./../js/hero-image-presets.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>總覽 - OfferDash</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        /* 🌟 共用側邊欄／頂部列仍沿用全站的設計變數，讓它們照舊跟著使用者的
+           Light / Dark / System 主題切換——這兩個是「共用元件」，不該被這頁鎖死。 */
+        :root {
+            --bg-page: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --bg-input: #F8FAFC;
+            --border: #E2E8F0;
+            --text-main: #0F172A;
+            --text-muted: #475569;
+            --accent: #324c94;
+            --accent-hover: #1E40AF;
+            --accent-glow: rgba(30, 58, 138, 0.14);
+            --danger: #DC2626;
+            --success: #059669;
+            --radius-lg: 1.25rem;
+            --radius-md: 0.75rem;
+            --radius-sm: 0.5rem;
+
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(226, 232, 240, 0.6);
+            --overlay-bg: rgba(15, 23, 42, 0.15);
+            --hover-tint: rgba(30, 58, 138, 0.06);
+            --active-tint: rgba(30, 58, 138, 0.08);
+            --card-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.1), 0 4px 16px rgba(15, 23, 42, 0.04);
+            --card-shadow-hover: 0 12px 32px rgba(15, 23, 42, 0.1);
+            --sidebar-shadow: 4px 0 24px rgba(15, 23, 42, 0.05);
+            --scrollbar-track: #F1F5F9;
+            --scrollbar-thumb: #CBD5E1;
+            --hero-overlay-bg: rgba(248, 250, 252, 0.7); /* 淺色模式：半透明白，讓深色文字維持清晰 */
+        }
+
+        :root.dark {
+            /* 🌑 現代科技黑：主要背景改成純黑／深黑灰色系，取代原本偏藍的深 slate 色階，
+               強調色（--accent 藍）保留，作為按鈕／連結／互動元素的少量亮色點綴 */
+            --bg-page: #0A0A0A;
+            --bg-card: #141414;
+            --bg-input: #1A1A1A;
+            --border: #262626;
+            --text-main: #FAFAFA;
+            --text-muted: #A3A3A3;
+            --accent: #3B82F6;
+            --accent-hover: #60A5FA;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --danger: #F87171;
+            --success: #34D399;
+
+            --glass-bg: rgba(10, 10, 10, 0.7);
+            --glass-border: rgba(38, 38, 38, 0.6);
+            --overlay-bg: rgba(0, 0, 0, 0.6);
+            --hover-tint: rgba(59, 130, 246, 0.12);
+            --active-tint: rgba(59, 130, 246, 0.16);
+            --card-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4);
+            --card-shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.6);
+            --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+            --scrollbar-track: #0A0A0A;
+            --scrollbar-thumb: #333333;
+            --hero-overlay-bg: rgba(10, 10, 10, 0.6); /* 深色模式：半透明黑，讓白色文字維持清晰 */
+        }
+
+        /* 🌌 body 本身（含捲軸配色）維持固定深色 slate 色階，不隨主題切換——這是最外層
+           的「畫布」背景，實際會被上面的 Hero／走馬燈／頁尾各區塊完全蓋住，使用者不會看到它。
+           Hero 遮罩、走馬燈區塊、頁尾則都已改成用 var(--hero-overlay-bg)/var(--bg-page)/
+           var(--text-main) 等變數，會正確跟著 Light/Dark/System 主題切換。 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #0A0A0A;
+            color: #FAFAFA;
+            -webkit-font-smoothing: antialiased;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0A0A0A; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 4px; border: 2px solid #0A0A0A; }
+        ::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
+
+        /* ============== App 版面骨架（側邊欄／頂部列與全站一致） ============== */
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--glass-border);
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: var(--sidebar-shadow);
+            z-index: 200;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed { transform: translateX(-100%); }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 150;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.hidden { opacity: 0; visibility: hidden; }
+        #sidebarToggle:hover { background: var(--hover-tint) !important; }
+
+        @media (max-width: 768px) {
+            .sidebar { position: absolute; height: 100%; transform: translateX(0); }
+            .sidebar.collapsed { width: 260px; transform: translateX(-100%); padding: 32px 20px; }
+        }
+
+        .menu-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover { background: var(--hover-tint); color: var(--text-main); }
+        .menu-item.active { background: var(--active-tint); color: var(--accent); border-left: 4px solid var(--accent); }
+
+        .menu-item-group { position: relative; }
+        .menu-item-parent { justify-content: space-between; }
+        .submenu-arrow { font-size: 10px; transition: transform 0.3s ease; }
+        .menu-item-group.open .submenu-arrow,
+        .menu-item-group:hover .submenu-arrow { transform: rotate(180deg); }
+        .submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .menu-item-group.open .submenu,
+        .menu-item-group:hover .submenu { max-height: 160px; }
+
+        .submenu-item {
+            padding: 10px 16px 10px 32px;
+            margin-top: 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .submenu-item:hover { background: var(--hover-tint); color: var(--text-main); }
+        .submenu-item.active { background: var(--active-tint); color: var(--accent); font-weight: 600; }
+
+        .main-content {
+            width: 100%;
+            flex: 1;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            /* header 改成 position:fixed 後不再佔文件流空間，這裡補回等高的上邊距，
+               避免內容被固定 header 蓋住 */
+            padding-top: 96px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-transform: uppercase;
+            /* 🔥 body 的 color 是固定寫死的白色（給下面的固定深色外殼用），header 的 logo
+               沒有自己設定顏色的話會直接繼承到那個白字，淺色模式下疊在淺色毛玻璃 header 上
+               會整個看不見。這裡明確接回 var(--text-main)，讓 logo 文字正確跟著主題切換。 */
+            color: var(--text-main);
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        /* 🌟 Edge-to-Edge：header 固定滿版於視窗頂端（見 shared-header.js），高度統一為 72px，
+           全站 8 個頁面都用同一組數值，搭配 .main-content 的 padding-top: 96px 補回空間 */
+        header {
+            width: 100%;
+            max-width: 100%;
+            height: 72px;
+            padding: 0 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        /* ==============================================
+           1. 沉浸式 Hero：左側問候與 CTA／右側透明成長趨勢圖
+        ============================================== */
+        .hero-section {
+            position: relative;
+            width: 100%;
+            /* 原本 450px；.main-content 現在有 padding-top: 96px 讓內容避開固定 header，
+               但 Hero 背景圖片應該要滿版延伸到最頂端（蓋在毛玻璃 header 底下透出來），
+               所以用 margin-top: -96px 把 Hero 拉回貼齊最上緣，同時把高度加回這 96px，
+               避免底下的走馬燈區塊跟著被拉上去。另外再往下多延伸 200px。
+               450 + 96 (補償上拉) + 200 (往下延伸) = 746px */
+            height: 746px;
+            margin-top: -96px;
+            flex-shrink: 0;
+            /* 視差滾動時背景圖片層會位移超出自己的範圍，這裡負責把多出來的部分裁掉，
+               確保圖片位移不會溢出 Hero 區塊本身的邊界 */
+            overflow: hidden;
+        }
+
+        /* 背景圖片層：從 .hero-section 獨立出來，專門負責視差滾動位移。
+           scale(1.2) 預先放大，讓位移時四周留有緩衝，捲動時邊緣不會露出裁切容器外的空白。
+           實際圖片來源（預設科技感 SVG 或使用者自訂上傳照片）由 applyHeroImage() 動態寫入。 */
+        .hero-bg-image {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            /* 佔位背景：先用深色科技感漸層代替真實照片，applyHeroImage() 會在載入時
+               覆寫成使用者在「設定」頁選擇的實際圖片 */
+            background-image:
+                radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.25) 0%, transparent 45%),
+                radial-gradient(circle at 85% 75%, rgba(30, 58, 138, 0.35) 0%, transparent 50%),
+                linear-gradient(135deg, #050505 0%, #0A0A0A 55%, #141414 100%);
+            background-size: cover;
+            background-position: center;
+            transform: scale(1.3);
+            will-change: transform;
+        }
+
+        /* 深淺色主題遮罩：疊在背景圖片之上、前景文字之下（z-index 介於兩者之間）。
+           淺色模式用半透明白，讓深色文字維持清晰；深色模式用半透明深藍黑，讓白色文字維持清晰。
+           顏色本身由 var(--hero-overlay-bg) 決定，跟著 Light/Dark/System 主題自動切換。 */
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background: var(--hero-overlay-bg);
+            transition: background-color 0.3s ease;
+        }
+
+        .hero-grid {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 1280px; /* max-w-7xl */
+            height: 100%;
+            margin: 0 auto;
+            box-sizing: border-box;
+            padding: 0 48px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: center;
+            gap: 56px;
+        }
+
+        .hero-left {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .hero-greeting {
+            margin: 0 0 14px 0;
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            color: var(--text-main);
+            transition: color 0.3s ease;
+        }
+
+        .hero-subtitle {
+            margin: 0 0 32px 0;
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            transition: color 0.3s ease;
+        }
+
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 36px;
+            border: none;
+            border-radius: 100px;
+            background: #2563EB;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            box-shadow: 0 20px 40px -8px rgba(59, 130, 246, 0.3); /* shadow-blue-500/30 */
+            transition: all 0.2s ease;
+        }
+
+        .hero-cta:hover {
+            background: #3B82F6;
+            transform: translateY(-2px);
+            box-shadow: 0 24px 48px -8px rgba(59, 130, 246, 0.45);
+        }
+
+        .hero-right {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hero-chart-title {
+            margin: 0 0 16px 0;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--text-muted);
+            transition: color 0.3s ease;
+        }
+
+        /* 圖表容器完全透明：不帶背景色、不帶邊框，直接融在 Hero 底圖之上。
+           position: relative 是 Chart.js responsive+maintainAspectRatio:false 正確抓取容器尺寸的必要條件 */
+        .hero-chart-container {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            background: transparent;
+            border: none;
+        }
+
+        .hero-chart-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; gap: 24px; padding: 32px 24px; }
+            .hero-right { height: 220px; }
+            .hero-section { height: auto; min-height: 856px; } /* 560 + 96(補償 margin-top:-96px) + 200(往下延伸) */
+        }
+
+        @media (max-width: 640px) {
+            .hero-greeting { font-size: 32px; }
+        }
+
+        /* ==============================================
+           2. 橫向走馬燈：最近面試紀錄
+           🔥 這個區塊改成跟頁尾一樣「獨立跟著 Light/Dark/System 主題切換」，不再沿用
+           Hero 那套刻意固定深色的外殼語彙——原本 .carousel-header 寫死 #F8FAFC 白字，
+           淺色模式下文字會直接看不見，這裡一併修掉。
+        ============================================== */
+        .carousel-section {
+            width: 100%;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 56px 48px 40px;
+            box-sizing: border-box;
+            background: var(--bg-page);
+            transition: background-color 0.3s ease;
+        }
+
+        .carousel-header {
+            margin: 0 0 20px 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            transition: color 0.3s ease;
+        }
+
+        .carousel-empty {
+            margin: 0;
+            padding: 40px 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* 走馬燈可視窗：只負責裁切，滾動條隱藏也放在這一層 */
+        .carousel-viewport {
+            width: 100%;
+            overflow: hidden;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+
+        .carousel-viewport::-webkit-scrollbar { display: none; }
+
+        /* 軌道本身寬度依內容自然撐開（複製一份卡片接在尾端後會是「兩份」的總寬），
+           搭配 @keyframes 平移 -50% 正好等於「一份」的寬度，達到無縫循環 */
+        .carousel-track {
+            display: flex;
+            gap: 24px;
+            width: max-content;
+            padding-bottom: 16px;
+        }
+
+        .carousel-track.marquee-active {
+            animation-name: marqueeScroll;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-duration: 30s; /* 由 JS 依卡片數量動態覆蓋，卡片愈多動畫時間愈長，捲動速度感覺一致 */
+        }
+
+        /* 滑鼠移入走馬燈容器時立刻暫停，移出後從暫停處繼續（不是重置回頭） */
+        .carousel-viewport:hover .carousel-track.marquee-active {
+            animation-play-state: paused;
+        }
+
+        @keyframes marqueeScroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        /* 卡片內容樣式與 dashboard.html 的 .card 系統完全一致（var(--bg-card)/var(--text-main) 等），
+           本來就會自動跟著 Light/Dark 主題切換，不需要額外處理 */
+        .card {
+            flex-shrink: 0;
+            width: 320px;
+            box-sizing: border-box;
+            background: var(--bg-card);
+            border: none;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 24px;
+            cursor: pointer;
+            transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card:hover {
+            box-shadow: var(--card-shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .card-role {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .card-date {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .card-score {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .card-feedback {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        /* ==============================================
+           3. 頁尾 Contact Us（與全站其他頁面一致：跟著 Light/Dark/System 主題切換。
+           🔥 這裡「不」跟隨 Hero／走馬燈標題那套固定深色語彙——之前把整頁鎖死深色時，
+           連 Footer 也一起鎖死了，導致使用者選 Light 主題後，全站其他頁面的頁尾都變淺色，
+           唯獨這頁還是深色，跟其他頁面不一致。改用 var(--bg-page)/var(--text-main) 等變數，
+           讓這個區塊即使外殼（Hero／走馬燈）維持固定深色，頁尾也能正確跟著主題切換。 */
+        .site-footer {
+            width: 100%;
+            border-top: 1px solid var(--border);
+            background: var(--bg-page);
+            color: var(--text-main);
+        }
+
+        .footer-inner {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 48px 24px 24px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 48px;
+            flex-wrap: wrap;
+        }
+
+        .footer-brand {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .footer-brand p {
+            margin: 12px 0 0;
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 320px;
+        }
+
+        .footer-contact {
+            flex: 1.4;
+            min-width: 280px;
+        }
+
+        .footer-contact h3 {
+            margin: 0 0 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-contact-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .footer-contact-item {
+            display: flex;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a.footer-contact-item:hover {
+            color: var(--accent);
+        }
+
+        .footer-contact-label {
+            min-width: 52px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-top: 2px;
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-social a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .footer-social a:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 16px 24px 32px;
+            box-sizing: border-box;
+            color: var(--text-muted);
+            font-size: 13px;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .footer-inner {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-layout">
+
+        <div id="appSidebar" data-active="overview"></div>
+        <script src="./../js/shared-sidebar.js"></script>
+
+        <div class="main-content">
+
+            <div id="appHeader"></div>
+            <script src="./../js/shared-header.js"></script>
+
+            <!-- 1. 沉浸式 Hero：左側問候與 CTA／右側透明成長趨勢圖
+                 背景圖片（.hero-bg-image）／深淺色遮罩（.hero-overlay）／前景文字（.hero-grid）
+                 三層依序疊放，搭配下方 initHeroParallax() 做視差滾動 -->
+            <section class="hero-section">
+                <div class="hero-bg-image" id="heroBgImage"></div>
+                <div class="hero-overlay"></div>
+                <div class="hero-grid">
+                    <div class="hero-left">
+                        <h1 class="hero-greeting" id="overviewGreeting">您好</h1>
+                        <p class="hero-subtitle">歡迎回來，準備好迎接下一場挑戰了嗎？</p>
+                        <button class="hero-cta" onclick="window.location.href='/index.html'">
+                            開始面試 Start Interview
+                        </button>
+                    </div>
+                    <div class="hero-right">
+                        <div class="hero-chart-container">
+                            <!-- Chart.js 折線圖：由下方 <script> 的 initTrendChart() 負責初始化，
+                                 資料來自 /api/interview/history（與 dashboard.html 同一份 API） -->
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. 橫向走馬燈：最近面試紀錄（卡片樣式與 dashboard.html 一致，資料來自真實 API） -->
+            <section class="carousel-section">
+                <h2 class="carousel-header">最近面試紀錄</h2>
+                <div class="carousel-viewport" id="carouselViewport">
+                    <div class="carousel-track" id="recordsCarousel">
+                        <!-- 由下方 JS 的 renderRecordsCarousel() 動態產生，並在資料載入後
+                             複製一份接在尾端做成無縫循環 -->
+                    </div>
+                </div>
+            </section>
+
+            <div id="appFooter"></div>
+            <script src="./../js/shared-footer.js"></script>
+
+        </div>
+    </div>
+
+    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar) return;
+            sidebar.classList.toggle('collapsed');
+            const isOpen = !sidebar.classList.contains('collapsed');
+            if (overlay) overlay.classList.toggle('hidden', !isOpen);
+        }
+
+        // 智慧區塊切換與路由邏輯：本頁是獨立頁面，其餘功能一律跳轉過去
+        function switchFeature(featureName) {
+            const BASE_PATH = '';
+
+            if (featureName === 'interview' || featureName === 'jd') {
+                window.location.href = `${BASE_PATH}/index.html?feature=${featureName}`;
+                return;
+            }
+            if (featureName === 'dashboard') {
+                window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                return;
+            }
+            if (featureName === 'resume-records') {
+                window.location.href = `${BASE_PATH}/frontend/pages/resume_records.html`;
+                return;
+            }
+            if (featureName === 'consultant') {
+                window.location.href = `${BASE_PATH}/frontend/pages/consultant.html`;
+                return;
+            }
+            if (featureName === 'calendar') {
+                window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                return;
+            }
+            if (featureName === 'settings') {
+                window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                return;
+            }
+
+            // featureName === 'overview'：已經在本頁，只需收合側邊欄
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar && !sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
+            if (overlay && !overlay.classList.contains('hidden')) overlay.classList.add('hidden');
+        }
+
+        function escapeHtml(value = "") {
+            return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // ---------------------------
+        // Hero 背景圖片：讀取「設定」頁面（外觀與系統體驗 → 主頁視覺風格）存的選擇並套用。
+        // 預設圖片與自訂上傳圖片的判斷邏輯來自 frontend/js/hero-image-presets.js，
+        // 跟 settings.html 的縮圖選單共用同一份定義，兩邊視覺保證一致。
+        // ---------------------------
+        function applyHeroImage(heroImage) {
+            const heroBgImage = document.getElementById('heroBgImage');
+            if (!heroBgImage || typeof getHeroImageBackgroundCss !== 'function') return;
+            heroBgImage.style.backgroundImage = getHeroImageBackgroundCss(heroImage);
+        }
+
+        // ---------------------------
+        // 視差滾動 (Parallax Scrolling)：捲動時背景圖片位移速度只有前景內容的一部分，
+        // 製造「背景比較遠、前景比較近」的立體空間感。
+        //
+        // 🔥 這裡沒有照字面聽 window.scrollY——這個頁面的 <body> 本身是 overflow:hidden、
+        // 固定 100vh（見上方 body 樣式），真正會捲動的元素是 .main-content（overflow-y:auto），
+        // window/document 本身永遠不會捲動，window.scrollY 會恆為 0。監聽對象換成
+        // .main-content 的 scroll 事件、位移量改用它的 scrollTop，效果才會真的生效。
+        // ---------------------------
+        function initHeroParallax() {
+            const scrollContainer = document.querySelector('.main-content');
+            const heroBgImage = document.getElementById('heroBgImage');
+            if (!scrollContainer || !heroBgImage) return;
+
+            const PARALLAX_FACTOR = 0.4; // 背景移動速度只有前景捲動速度的 40%
+            // 🔥 Hero 高度後來從 450px 加高到 746px（置頂＋往下延伸 200px 那次改動），
+            // 但這個上限當初是照舊的 450px 抓的，導致捲動一下下（~100px）位移就頂到上限、
+            // 整個效果瞬間「定格」不再變化——尤其滑鼠滾輪一次常常就是 100px 以上，
+            // 視覺上幾乎等於完全沒有漸進位移的過程，感覺就像沒有作用。
+            // 現在 CSS 的 scale(1.3) 對 746px 高的容器可以提供約 112px 的緩衝空間，
+            // 上限跟著放大到 100px，捲動到 250px 左右才會頂到上限，效果會持續明顯更久。
+            const MAX_OFFSET_PX = 100; // 對應 CSS scale(1.3) 預留的緩衝範圍，避免位移過頭露出裁切邊界外的空白
+            let ticking = false;
+
+            function updateParallax() {
+                const offset = Math.min(scrollContainer.scrollTop * PARALLAX_FACTOR, MAX_OFFSET_PX);
+                // translate3d 用 GPU 合成層處理位移，比單純 translateY 更省效能、更不容易掉幀
+                heroBgImage.style.transform = `translate3d(0, ${offset}px, 0) scale(1.3)`;
+                ticking = false;
+            }
+
+            // rAF 節流：捲動事件觸發頻率遠高於螢幕更新頻率，用 requestAnimationFrame
+            // 確保每個畫面更新周期最多只重新計算一次，維持 60fps 順暢度、避免掉幀卡頓
+            scrollContainer.addEventListener('scroll', () => {
+                if (!ticking) {
+                    requestAnimationFrame(updateParallax);
+                    ticking = true;
+                }
+            }, { passive: true });
+
+            updateParallax(); // 立即同步一次初始狀態，避免載入當下的位移量跟實際捲動位置對不齊
+        }
+
+        // ---------------------------
+        // 面試歷史紀錄：與 dashboard.html 共用同一份 API，同一批資料同時餵給
+        // 「成長趨勢圖」與「最近面試紀錄走馬燈」使用
+        // ---------------------------
+        const API_BASE_URL = "http://localhost:8000/api/interview";
+        let realData = [];
+        let trendChartInstance = null;
+
+        // 卡片渲染邏輯與 dashboard.html 的 renderCards() 完全一致，onclick 導去 dashboard 該筆詳細報告
+        function buildRecordCardHtml(item) {
+            return `
+                <div class="card" onclick="window.location.href='/frontend/pages/dashboard.html?record=${item.id}'">
+                    <div class="card-header">
+                        <div class="card-role">${escapeHtml(item.role || '未定職位')}</div>
+                        <div class="card-date">${escapeHtml(item.date || '未知時間')}</div>
+                    </div>
+                    <div class="card-score">${item.totalScore || 0} <span style="font-size:14px; color:var(--text-muted);">/ 100</span></div>
+                    <div class="card-feedback">${escapeHtml(item.shortFeedback || '無評語')}</div>
+                </div>
+            `;
+        }
+
+        function renderRecordsCarousel() {
+            const track = document.getElementById('recordsCarousel');
+            if (!track) return;
+
+            // 每次重新渲染前先清空、停掉動畫，避免資料重新整理時複製品愈疊愈多
+            track.classList.remove('marquee-active');
+            track.style.removeProperty('animation-duration');
+            track.innerHTML = '';
+
+            if (realData.length === 0) {
+                track.innerHTML = `<p class="carousel-empty">尚無面試紀錄，前往進行模擬面試吧！</p>`;
+                return;
+            }
+
+            // 走馬燈只需要「最近幾筆」，跟 dashboard.html 的趨勢圖一樣取最近 10 筆
+            const records = realData.slice(0, 10);
+            track.innerHTML = records.map(buildRecordCardHtml).join('');
+
+            // 只有 1 筆資料時複製了也看不出「無縫循環」的效果，直接維持靜態顯示就好
+            if (records.length < 2) return;
+
+            // 🔁 無縫走馬燈核心：把這組卡片完整複製一份（cloneNode）接在軌道尾端。
+            //    這樣軌道總寬度變成「原本的兩份」，動畫只要平移 -50%（正好一份的寬度）
+            //    就能無痕接回開頭，不用手動計算任何 px，卡片數量或寬度變動也不會壞掉。
+            const originalCards = Array.from(track.children);
+            originalCards.forEach(card => {
+                const clone = card.cloneNode(true);
+                clone.setAttribute('aria-hidden', 'true'); // 複製品純視覺用，不重複念給螢幕閱讀器聽
+                track.appendChild(clone);
+            });
+
+            // 卡片愈多，動畫時間拉愈長，讓捲動速度感覺是穩定一致的（不會卡片一多就變超快）
+            const duration = Math.max(records.length * 6, 20);
+            track.style.animationDuration = `${duration}s`;
+            track.classList.add('marquee-active');
+        }
+
+        // ---------------------------
+        // 成長趨勢圖：改用 Chart.js（CDN 已在 <head> 引入），資料同樣來自 realData
+        // ---------------------------
+        function initTrendChart() {
+            const canvas = document.getElementById('trendChart');
+            if (!canvas || realData.length < 2) return;
+
+            // 跟 dashboard.html 的排序邏輯一致：realData 是「最新 -> 最舊」，取最近 10 筆後反轉成「舊 -> 新」
+            const chartData = realData.slice(0, 10).reverse();
+            const scores = chartData.map(d => d.totalScore || 0);
+            const labels = chartData.map(d => {
+                const parts = (d.date || '').split('-');
+                return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : d.date;
+            });
+
+            if (trendChartInstance) trendChartInstance.destroy();
+
+            trendChartInstance = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: scores,
+                        // 🔆 深色主題背景已改成純黑，原本的 #60A5FA 對比不夠亮眼，
+                        // 換成同一色系但更亮的藍（blue-300），曲線在純黑背景上更醒目
+                        borderColor: '#93C5FD',
+                        backgroundColor: 'rgba(147, 197, 253, 0.18)',
+                        borderWidth: 3,
+                        tension: 0.4, // 平滑曲線
+                        fill: true,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#0A0A0A',
+                        pointBorderColor: '#93C5FD',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 8, right: 4, bottom: 0, left: 4 } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#141414',
+                            titleColor: '#FAFAFA',
+                            bodyColor: '#A3A3A3',
+                            borderColor: '#262626',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            // 隱藏 X 軸網格線，只保留淺色日期標籤
+                            grid: { display: false, drawBorder: false },
+                            border: { display: false },
+                            ticks: { color: '#A3A3A3', font: { size: 11 } }
+                        },
+                        y: {
+                            // 隱藏 Y 軸網格線與刻度，維持極簡的透明底
+                            display: false,
+                            grid: { display: false, drawBorder: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 問候語：優先使用「設定」頁面存的顯示名稱，沒設定過就退回顯示登入信箱
+        window.onload = async () => {
+            const user = await checkAuthStatus();
+            if (!user) return;
+
+            initHeroParallax();
+
+            let displayName = '';
+            try {
+                const raw = localStorage.getItem('userSettings');
+                if (raw) {
+                    const settings = JSON.parse(raw);
+                    displayName = (settings.displayName || '').trim();
+                    applyHeroImage(settings.heroImage);
+                }
+            } catch (error) {
+                console.error('讀取使用者設定失敗:', error);
+            }
+
+            const greetingName = displayName || user.email || '使用者';
+            const greetingEl = document.getElementById('overviewGreeting');
+            if (greetingEl) greetingEl.innerText = `${greetingName} 您好`;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/history`, {
+                    headers: await getAuthHeaders()
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    realData = data.records || [];
+                }
+            } catch (err) {
+                console.error("面試歷史紀錄連線失敗:", err);
+            }
+
+            renderRecordsCarousel();
+            initTrendChart();
+        };
+    </script>
+</body>
+
+</html>

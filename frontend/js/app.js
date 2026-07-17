@@ -3,38 +3,20 @@
 // ==========================================
 const API_BASE = "http://localhost:8000/api";
 const backendUrl = `${API_BASE}/interview/next`;
-const reportUrl = `${API_BASE}/interview/report`;
-
-// 面試狀態與音訊變數
-let mediaRecorder = null;
-let audioChunks = [];
-let chatHistory = [];
-let audioContext = null;
-let audioSource = null;
-let analyser = null;
-let animationId = null;
 
 // 流程控制變數
-let isSetupMode = true;
-let currentRound = 0;
-let MAX_ROUNDS = 2;
 let currentReportPayload = null;
-let resumeFile = null;
-let uploadedResumeUrl = null;
-let currentInputMode = 'voice';
+let currentJdDiagnosisPayload = null; // 履歷與 JD 契合度診斷結果，供「確認儲存紀錄」使用
+// 🔥 履歷檔案分成兩份獨立狀態：面試設定（發射台）跟「履歷與 JD 診斷」各自的上傳互不影響，
+// 避免使用者在其中一邊上傳履歷後，切去另一個功能時被誤用/被清掉
+let jdResumeFile = null;
+let interviewResumeFile = null;
+let battlePrepJD = ''; // 由「一鍵備戰」帶入的 JD 內容，讓面試更客製化
 
 // ==========================================
 // 2. DOM 元素抓取 (DOM Elements)
 // ==========================================
-const dialogueBox = document.getElementById("dialogueBox");
 const startBtn = document.getElementById("mainBtn");
-const stopBtn = document.getElementById("stopBtn");
-const statusIndicator = document.getElementById("statusIndicator");
-const statusLabel = document.getElementById("statusLabel");
-const aiPlayer = document.getElementById("aiPlayer");
-const visualizerContainer = document.getElementById("visualizerContainer");
-const canvas = document.getElementById("visualizer");
-const canvasCtx = canvas ? canvas.getContext("2d") : null;
 const jobTitleInput = document.getElementById("jobTitle");
 const companyNameInput = document.getElementById("companyName");
 
@@ -44,14 +26,17 @@ const companyNameInput = document.getElementById("companyName");
 let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 檢查登入狀態 (請確保 checkAuthStatus 已經定義)
+    // 1. 檢查登入狀態
     if (typeof checkAuthStatus === 'function') {
         currentUser = await checkAuthStatus();
         if (!currentUser) return;
         console.log("使用者已登入:", currentUser.email);
     }
 
-    // 2. 綁定按鈕與輸入框狀態
+    // 2. 帶入「設定」頁面儲存的面試偏好預設值（使用者沒設定過的欄位就維持原本空白/預設值）
+    applyInterviewDefaultsFromSettings();
+
+    // 3. 綁定按鈕與輸入框狀態
     if (jobTitleInput && companyNameInput) {
         jobTitleInput.addEventListener("input", checkInputs);
         companyNameInput.addEventListener("input", checkInputs);
@@ -59,15 +44,96 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (startBtn) startBtn.onclick = handleMainAction;
 
-    // 3. 初始化上傳區塊
-    setupUploadZone('uploadZone', 'resumeUpload', 'uploadText');
-    setupUploadZone('interviewUploadZone', 'interviewResumeUpload', 'interviewUploadText');
+    // 4. 初始化上傳區塊
+    setupUploadZone('uploadZone', 'resumeUpload', 'uploadText', 'jd');
+    setupUploadZone('interviewUploadZone', 'interviewResumeUpload', 'interviewUploadText', 'interview');
 
-    // 4. 解析網址參數 (自動切換到 JD 功能)
-    const urlParams = new URLSearchParams(window.location.search);
-    const initialFeature = urlParams.get('feature') === 'jd' ? 'jd' : 'interview';
-    switchFeature(initialFeature, { updateHistory: false });
+    // 5. 承接「面試管家」一鍵備戰帶來的公司/職位/JD 資料（比預設職位更具體，蓋過預設值）
+    applyBattlePrepFromStorage();
+
+    // 6. 若剛從面試戰場頁面 (interview_arena.html) 完成面試導回來，還原並顯示復盤報告
+    const reportRestored = restorePendingInterviewReportIfAny();
+
+    // 7. 🔥 關鍵修正：明確地、依序地把「網址帶的 ?feature= 該不該生效」交給 router.js 判斷，
+    //    並告知它報告是否剛剛已經還原顯示了。不再讓 router.js 自己另外掛一個 DOMContentLoaded
+    //    監聽器、依賴「兩支互不相干的監聽器誰先執行完」這種脆弱的隱性時序假設——
+    //    現在整個「首頁載入後該顯示哪個畫面」的判斷順序完全由這裡一條線決定。
+    if (typeof autoResolveHomeFeatureFromURL === 'function') {
+        autoResolveHomeFeatureFromURL({ reportAlreadyRestored: reportRestored });
+    }
 });
+
+// 從「設定」頁面 (settings.html) 存的 userSettings 讀出面試偏好，自動帶入戰前設定表單的對應欄位。
+// 使用者臨時修改過的值一律以當下輸入框/隱藏欄位內容為準（見 buildBaseFormData），這裡只負責「載入時的預設值」。
+function applyInterviewDefaultsFromSettings() {
+    let settings;
+    try {
+        const raw = localStorage.getItem('userSettings');
+        if (!raw) return;
+        settings = JSON.parse(raw);
+    } catch (error) {
+        console.error('讀取面試偏好設定失敗:', error);
+        return;
+    }
+    if (!settings) return;
+
+    const defaultJobTitle = (settings.defaultJobTitle || '').trim();
+    if (jobTitleInput && defaultJobTitle) jobTitleInput.value = defaultJobTitle;
+
+    const defaultCompany = (settings.defaultCompany || '').trim();
+    if (companyNameInput && defaultCompany) companyNameInput.value = defaultCompany;
+
+    if (settings.defaultInterviewType) {
+        applyOptionSelection('type', settings.defaultInterviewType);
+    }
+    if (settings.defaultLocale) {
+        applyOptionSelection('lang', settings.defaultLocale);
+    }
+    if (settings.defaultDifficulty) {
+        applyOptionSelection('diff', settings.defaultDifficulty);
+    }
+
+    const roundsInput = document.getElementById("interviewRounds");
+    if (roundsInput && settings.defaultRounds) roundsInput.value = settings.defaultRounds;
+}
+
+// 依 value 尋找對應的自訂下拉選單選項（透過 data-value 比對），更新隱藏 input、顯示文字與選中樣式。
+// 與使用者手動點擊選項時呼叫的 selectOption() 共用同一組 DOM 結構，但不需要滑鼠事件即可程式化套用。
+function applyOptionSelection(category, value) {
+    let inputId, textId, optionsId;
+    if (category === 'type') { inputId = 'interviewType'; textId = 'typeSelectText'; optionsId = 'typeOptions'; }
+    else if (category === 'lang') { inputId = 'interviewLanguage'; textId = 'langSelectText'; optionsId = 'langOptions'; }
+    else if (category === 'diff') { inputId = 'interviewDifficulty'; textId = 'diffSelectText'; optionsId = 'diffOptions'; }
+    else return;
+
+    const optionsContainer = document.getElementById(optionsId);
+    if (!optionsContainer) return;
+
+    const matchedOption = optionsContainer.querySelector(`.custom-option[data-value="${value}"]`);
+    if (!matchedOption) return; // 設定值不在目前選項中（例如舊資料），保留原本預設，不強行套用
+
+    document.getElementById(inputId).value = value;
+    document.getElementById(textId).innerText = matchedOption.innerText.trim();
+    optionsContainer.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+    matchedOption.classList.add('selected');
+}
+
+// 從行事曆的「進入備戰」按鈕帶入的資料，自動填入面試設定並記住 JD 供 AI 客製化提問
+function applyBattlePrepFromStorage() {
+    const raw = localStorage.getItem('currentInterviewPrep');
+    if (!raw) return;
+    localStorage.removeItem('currentInterviewPrep'); // 只套用一次，避免之後每次進站都被覆蓋
+
+    try {
+        const prep = JSON.parse(raw);
+        if (jobTitleInput && prep.job_title) jobTitleInput.value = prep.job_title;
+        if (companyNameInput && prep.company) companyNameInput.value = prep.company;
+        battlePrepJD = prep.jd_text || '';
+        checkInputs();
+    } catch (error) {
+        console.error("讀取備戰資料失敗:", error);
+    }
+}
 
 // ==========================================
 // 4. UI 互動與下拉選單邏輯 (UI & Dropdowns)
@@ -84,54 +150,100 @@ function toggleSidebar() {
     if (overlay) overlay.classList.toggle('hidden', !isOpen);
 }
 
-// Growth Engine V2 overrides are appended near the end of the file.
-
-// 功能分頁切換
+// 功能分頁切換 (現在只負責最純粹的 UI 區塊顯示/隱藏)
 function switchFeature(featureName, options = {}) {
     const { updateHistory = true } = options;
 
+    // 0. 這些功能都是獨立頁面（不是 index.html 內部的 view-section），直接跳轉過去
+    if (featureName === 'calendar') {
+        window.location.href = 'frontend/pages/calendar.html';
+        return;
+    }
     if (featureName === 'dashboard') {
-        window.location.href = 'dashboard.html';
+        window.location.href = 'frontend/pages/dashboard.html';
+        return;
+    }
+    if (featureName === 'resume-records') {
+        window.location.href = 'frontend/pages/resume_records.html';
+        return;
+    }
+    if (featureName === 'consultant') {
+        window.location.href = 'frontend/pages/consultant.html';
+        return;
+    }
+    if (featureName === 'settings') {
+        window.location.href = 'frontend/pages/settings.html';
         return;
     }
 
+    // 1. 清除所有選單與視圖的 active 狀態
     document.querySelectorAll('.sidebar .menu-item').forEach(item => item.classList.remove('active'));
     document.querySelectorAll('.view-section').forEach(view => {
         view.classList.remove('active');
         if (view.id === 'reportCard') view.style.display = 'none'; // 確保報告卡片隱藏
     });
 
+    // 2. 啟動目標選單與視圖
     const targetMenu = document.getElementById(`menu-${featureName}`);
     const targetView = document.getElementById(`view-${featureName}`);
-    const canvasCard = document.querySelector('.canvas-card');
 
     if (targetMenu) targetMenu.classList.add('active');
     if (targetView) targetView.classList.add('active');
-    if (canvasCard) canvasCard.style.display = featureName === 'interview' ? 'flex' : 'none';
 
+    // 🔥 每次進入「履歷與職缺診斷」都強制重置成完全乾淨的初始狀態——
+    // 不管使用者先前是否已經上傳過履歷/貼過 JD/看過診斷結果，一律清空重來，
+    // 避免使用者誤以為看到的是新一次診斷，實際上卻是上次殘留的舊資料。
+    if (featureName === 'jd') {
+        resetJdDiagnosisState();
+    }
+
+    // 3. 處理網址與歷史紀錄 (動態支援所有 feature)
     if (updateHistory) {
-        const nextUrl = featureName === 'jd' ? 'index.html?feature=jd' : 'index.html';
+        const nextUrl = featureName === 'interview' ? 'index.html' : `index.html?feature=${featureName}`;
         history.pushState({ feature: featureName }, '', nextUrl);
     }
 
-    // 手機版自動收合
+    // 4. 手機版側邊欄自動收合
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebarOverlay');
     if (sidebar && !sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
     if (overlay && !overlay.classList.contains('hidden')) overlay.classList.add('hidden');
 }
 
-// 驗證輸入框解鎖按鈕
-window.addEventListener('popstate', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    switchFeature(urlParams.get('feature') === 'jd' ? 'jd' : 'interview', { updateHistory: false });
-});
+// 「履歷與職缺診斷」進入時的重置：把上傳履歷、JD 文字、職缺欄位、分析按鈕狀態、
+// 上次診斷結果全部清空/復原成初始值，確保每次從側邊欄點進來都是全新的一次診斷
+function resetJdDiagnosisState() {
+    jdResumeFile = null;
+    currentJdDiagnosisPayload = null;
+
+    const uploadText = document.getElementById('uploadText');
+    if (uploadText) {
+        uploadText.innerText = '點擊或將履歷拖曳至此 (支援 PDF)';
+        uploadText.style.color = 'var(--text-muted)';
+    }
+    // 清空 input 的檔案選取，允許使用者重新選同一個檔案也能觸發 change 事件
+    const resumeUploadInput = document.getElementById('resumeUpload');
+    if (resumeUploadInput) resumeUploadInput.value = '';
+
+    const jobDescriptionEl = document.getElementById('jobDescription');
+    if (jobDescriptionEl) jobDescriptionEl.value = '';
+    const jdJobTitleEl = document.getElementById('jdJobTitle');
+    if (jdJobTitleEl) jdJobTitleEl.value = '';
+    const jdCompanyNameEl = document.getElementById('jdCompanyName');
+    if (jdCompanyNameEl) jdCompanyNameEl.value = '';
+
+    // 分析按鈕復原成初始可點擊狀態，避免上次分析中途失敗時卡在 disabled/loading 文字
+    const analyzeBtn = document.getElementById('analyzeJdBtn');
+    if (analyzeBtn) {
+        analyzeBtn.innerText = '預先分析履歷契合度與預測考題';
+        analyzeBtn.disabled = false;
+    }
+}
 
 function checkInputs() {
     if (!jobTitleInput || !companyNameInput || !startBtn) return;
     startBtn.disabled = !(jobTitleInput.value.trim() && companyNameInput.value.trim());
 }
-
 
 // 1. 通用的下拉選單開關
 function toggleDropdown(optionId) {
@@ -199,114 +311,15 @@ document.addEventListener('click', (event) => {
 
 
 // ==========================================
-// 5. 音訊與視覺化處理 (Audio & Visualizer)
-// ==========================================
-function getSupportedMimeType() {
-    const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/wav"];
-    return types.find(type => MediaRecorder.isTypeSupported(type)) || "";
-}
-
-function visualize(stream) {
-    if (!canvasCtx) return;
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    audioSource = audioContext.createMediaStreamSource(stream);
-    audioSource.connect(analyser);
-
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    canvas.width = visualizerContainer.clientWidth;
-    canvas.height = visualizerContainer.clientHeight;
-    const barWidth = (canvas.width / bufferLength) * 1.2;
-
-    function draw() {
-        animationId = requestAnimationFrame(draw);
-        let x = 0;
-        analyser.getByteFrequencyData(dataArray);
-        canvasCtx.fillStyle = 'rgba(5, 5, 10, 0.8)';
-        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-        canvasCtx.fillStyle = '#0ea5e9';
-        canvasCtx.shadowBlur = 15;
-        canvasCtx.shadowColor = '#0ea5e9';
-
-        for (let i = 0; i < bufferLength; i++) {
-            let barHeight = (dataArray[i] / 255) * canvas.height;
-            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
-            x += barWidth;
-        }
-    }
-    draw();
-}
-
-// ==========================================
 // 6. 面試主流程 (Interview Workflow)
-// ==========================================
-async function handleMainAction() {
-    if (isSetupMode) {
-        startInterviewView();
-        await sendInitialRequestToAI();
-    } else {
-        await startRecording();
-    }
-}
-
-function startInterviewView() {
-    isSetupMode = false;
-    document.getElementById("setupCard").classList.add("hidden");
-    const toggle = document.getElementById("inputModeToggle");
-    if (toggle) toggle.classList.remove("hidden");
-
-    dialogueBox.innerHTML = `<div class="system-text">sys_init: connecting to AI module...</div>`;
-    updateStatus("processing", "Connecting...");
-}
-
-async function startRecording() {
-    audioChunks = [];
-    updateStatus("recording", "Recording Audio...");
-    startBtn.style.display = "none";
-    stopBtn.style.display = "flex";
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mimeType = getSupportedMimeType();
-        visualizerContainer.style.display = "flex";
-        visualize(stream);
-
-        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        mediaRecorder.onstop = async () => {
-            updateStatus("processing", "Transmitting to AI...");
-            await sendVoiceToAI(new Blob(audioChunks, { type: mimeType }), mimeType);
-        };
-        mediaRecorder.start();
-    } catch (err) {
-        console.error(err);
-        updateStatus("error", "Microphone access denied.");
-        restoreInputArea();
-    }
-}
-
-function stopInterviewWorkflow() {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
-    }
-    if (animationId) cancelAnimationFrame(animationId);
-    if (audioContext) audioContext.close();
-    visualizerContainer.style.display = "none";
-}
-
-// ==========================================
-// 7. API 通訊 (API Communication)
+//    面試對話本身已搬到獨立頁面 frontend/pages/interview_arena.html（見 interview.js），
+//    這裡只負責：打包設定表單 → 呼叫 AI 拿到第一題 → 把狀態交棒給面試戰場頁面。
 // ==========================================
 function buildBaseFormData() {
     const role = document.getElementById("jobTitle").value || "工程師";
     const company = document.getElementById("companyName").value || "科技公司";
     const type = document.getElementById("interviewType")?.value || "job";
     const language = document.getElementById("interviewLanguage")?.value || "zh";
-
-    // 🔥 1. 取得難度設定，如果找不到或沒選，防呆預設為 "medium"
     const difficulty = document.getElementById("interviewDifficulty")?.value || "medium";
 
     const formData = new FormData();
@@ -314,193 +327,87 @@ function buildBaseFormData() {
     formData.append("company_name", company);
     formData.append("interview_type", type);
     formData.append("interview_language", language);
-
-    // 🔥 2. 將難度打包進 formData
     formData.append("interview_difficulty", difficulty);
+
+    // 若是從「面試管家」一鍵備戰帶來的，附上 JD 讓 AI 提問更貼合職缺
+    if (battlePrepJD) formData.append("job_description", battlePrepJD);
 
     return formData;
 }
 
-async function sendInitialRequestToAI() {
+async function handleMainAction() {
+    if (!startBtn) return;
+    startBtn.disabled = true;
+    startBtn.innerText = "正在初始化 AI 面試官...";
+
     const roundsInput = document.getElementById("interviewRounds");
-    MAX_ROUNDS = parseInt(roundsInput?.value, 10) || 5;
-    if (MAX_ROUNDS < 1) MAX_ROUNDS = 1;
-    if (MAX_ROUNDS > 20) MAX_ROUNDS = 20;
+    let maxRounds = parseInt(roundsInput?.value, 10) || 5;
+    if (maxRounds < 1) maxRounds = 1;
+    if (maxRounds > 20) maxRounds = 20;
 
     const formData = buildBaseFormData();
     formData.append("audio_file", new Blob([""], { type: "audio/webm" }), "empty.webm");
     formData.append("chat_history_str", JSON.stringify([]));
-    if (resumeFile) formData.append("resume_file", resumeFile);
+    if (interviewResumeFile) formData.append("resume_file", interviewResumeFile);
 
     try {
         const response = await fetch(backendUrl, { method: "POST", body: formData });
         if (!response.ok) throw new Error("API Error");
         const data = await response.json();
 
-        if (data.resume_url) uploadedResumeUrl = data.resume_url;
-        chatHistory = data.chat_history;
+        // 打包這場面試的所有設定與第一題，交給獨立的面試戰場頁面接手進行
+        const arenaState = {
+            job_title: formData.get("job_title"),
+            company_name: formData.get("company_name"),
+            interview_type: formData.get("interview_type"),
+            interview_language: formData.get("interview_language"),
+            interview_difficulty: formData.get("interview_difficulty"),
+            job_description: formData.get("job_description") || "",
+            max_rounds: maxRounds,
+            current_round: 0,
+            resume_url: data.resume_url || null,
+            chat_history: data.chat_history,
+            latest_ai_text: data.ai_text,
+            latest_audio_base64: data.audio_base64
+        };
+        sessionStorage.setItem("interviewArenaState", JSON.stringify(arenaState));
 
-        renderDialogue(null, data.ai_text);
-        playAISpeech(data.audio_base64);
+        window.location.href = "/frontend/pages/interview_arena.html";
     } catch (error) {
-        updateStatus("error", "Connection Failed.");
-        restoreInputArea();
+        console.error("初始化面試失敗:", error);
+        alert("AI 面試官初始化失敗，請稍後再試。");
+        startBtn.disabled = false;
+        startBtn.innerText = "INITIATE SEQUENCE";
     }
-}
-
-async function sendVoiceToAI(audioBlob, mimeType) {
-    const fileExt = mimeType.includes("mp4") ? "m4a" : "webm";
-    const isFinalRound = (currentRound + 1 >= MAX_ROUNDS) ? "true" : "false";
-
-    const formData = buildBaseFormData();
-    formData.append("audio_file", audioBlob, `user_voice.${fileExt}`);
-    formData.append("chat_history_str", JSON.stringify(chatHistory));
-    formData.append("is_final_round", isFinalRound);
-
-    try {
-        const response = await fetch(backendUrl, { method: "POST", body: formData });
-        if (!response.ok) throw new Error("API Error");
-        const data = await response.json();
-
-        chatHistory = data.chat_history;
-        currentRound++;
-        renderDialogue(data.user_text, data.ai_text);
-        playAISpeech(data.audio_base64);
-    } catch (error) {
-        updateStatus("error", "Connection Failed.");
-        restoreInputArea();
-    }
-}
-
-async function submitTextAnswer() {
-    const inputEl = document.getElementById("userTextInput");
-    const typedText = inputEl.value.trim();
-    if (!typedText) return;
-
-    inputEl.value = "";
-    updateStatus("processing", "Transmitting to AI...");
-    document.getElementById("textInputContainer").classList.add("hidden");
-    document.getElementById("inputModeToggle").classList.add("hidden");
-
-    const isFinalRound = (currentRound + 1 >= MAX_ROUNDS) ? "true" : "false";
-    const formData = buildBaseFormData();
-
-    // 🔥 加上這兩行：獲取難度並打包送出
-    const diffInput = document.getElementById("interviewDifficulty");
-    formData.append("interview_difficulty", diffInput ? diffInput.value : "medium");
-
-    formData.append("audio_file", new Blob([""], { type: "audio/webm" }), "empty.webm");
-    formData.append("chat_history_str", JSON.stringify(chatHistory));
-    formData.append("text_answer", typedText);
-    formData.append("is_final_round", isFinalRound);
-
-    try {
-        const response = await fetch(backendUrl, { method: "POST", body: formData });
-        if (!response.ok) throw new Error("API Error");
-        const data = await response.json();
-
-        chatHistory = data.chat_history;
-        currentRound++;
-        renderDialogue(typedText, data.ai_text);
-        playAISpeech(data.audio_base64);
-    } catch (error) {
-        updateStatus("error", "Connection Failed.");
-        restoreInputArea();
-    }
-}
-
-// ==========================================
-// 8. UI 控制邏輯 (UI Controls)
-// ==========================================
-function switchInputMode(mode) {
-    currentInputMode = mode;
-    document.getElementById("modeVoiceBtn")?.classList.toggle("active", mode === 'voice');
-    document.getElementById("modeTextBtn")?.classList.toggle("active", mode === 'text');
-
-    if (mode === 'voice') {
-        startBtn.style.display = "flex";
-        document.getElementById("textInputContainer")?.classList.add("hidden");
-    } else {
-        startBtn.style.display = "none";
-        document.getElementById("textInputContainer")?.classList.remove("hidden");
-        visualizerContainer.style.display = "none";
-        stopInterviewWorkflow();
-    }
-}
-
-function restoreInputArea() {
-    document.getElementById("inputModeToggle")?.classList.remove("hidden");
-    if (currentInputMode === 'voice') {
-        startBtn.style.display = "flex";
-        stopBtn.style.display = "none";
-        startBtn.innerText = "Transmit Audio";
-    } else {
-        document.getElementById("textInputContainer")?.classList.remove("hidden");
-    }
-}
-
-function renderDialogue(userTxt, aiTxt) {
-    if (userTxt) {
-        dialogueBox.innerHTML += `<div class="msg-block user"><div class="msg-sender">USER</div><div class="user-text">${userTxt}</div></div>`;
-    }
-    if (aiTxt) {
-        dialogueBox.innerHTML += `<div class="msg-block ai"><div class="msg-sender">SYSTEM</div><div class="ai-text">${aiTxt}</div></div>`;
-    }
-    dialogueBox.scrollTop = dialogueBox.scrollHeight;
-}
-
-function playAISpeech(base64Audio) {
-    updateStatus("processing", "System is speaking...");
-    aiPlayer.src = `data:audio/mp3;base64,${base64Audio}`;
-    aiPlayer.play();
-
-    aiPlayer.onended = () => {
-        if (currentRound >= MAX_ROUNDS) {
-            updateStatus("standby", "Interview Completed");
-            document.querySelector(".controls").style.display = "none";
-            document.getElementById("inputModeToggle")?.classList.add("hidden");
-            document.getElementById("textInputContainer")?.classList.add("hidden");
-            generateReport();
-        } else {
-            updateStatus("standby", "Ready for Input");
-            restoreInputArea();
-        }
-    };
-}
-
-function updateStatus(state, message) {
-    if (!statusIndicator || !statusLabel) return;
-    statusLabel.innerText = message;
-    statusIndicator.className = "status-dot";
-
-    const colors = { recording: '#ef4444', processing: '#3b82f6', standby: '#10b981' };
-    statusIndicator.style.background = colors[state] || '#475569';
-    statusIndicator.style.boxShadow = colors[state] ? `0 0 10px ${colors[state]}` : 'none';
 }
 
 // ==========================================
 // 9. 履歷上傳與 ATS 解析 (Resume & JD)
 // ==========================================
-function setupUploadZone(zoneId, inputId, textId) {
+function setupUploadZone(zoneId, inputId, textId, target) {
     const zone = document.getElementById(zoneId);
     const input = document.getElementById(inputId);
     const textElement = document.getElementById(textId);
     if (!zone || !input) return;
 
     zone.addEventListener('click', () => input.click());
-    input.addEventListener('change', function () { if (this.files[0]) handleFileUpload(this.files[0], textElement); });
-    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.background = "rgba(14, 165, 233, 0.1)"; });
-    zone.addEventListener('dragleave', (e) => { e.preventDefault(); zone.style.background = "rgba(0, 0, 0, 0.2)"; });
+    input.addEventListener('change', function () { if (this.files[0]) handleFileUpload(this.files[0], textElement, target); });
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.background = "rgba(30, 58, 138, 0.06)"; });
+    zone.addEventListener('dragleave', (e) => { e.preventDefault(); zone.style.background = "var(--bg-input)"; });
     zone.addEventListener('drop', (e) => {
         e.preventDefault();
-        zone.style.background = "rgba(0, 0, 0, 0.2)";
-        if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0], textElement);
+        zone.style.background = "var(--bg-input)";
+        if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0], textElement, target);
     });
 }
 
-function handleFileUpload(file, textElement) {
+function handleFileUpload(file, textElement, target) {
     if (file.type !== "application/pdf") return alert("目前只支援 PDF 格式的履歷喔！");
-    resumeFile = file;
+    if (target === 'jd') {
+        jdResumeFile = file;
+    } else {
+        interviewResumeFile = file;
+    }
     if (textElement) {
         textElement.innerText = `已載入履歷：${file.name}`;
         textElement.style.color = "var(--success)";
@@ -530,7 +437,7 @@ function transferToInterview() {
 }
 
 async function analyzeResumeMatch() {
-    if (!resumeFile) return alert("請先上傳 PDF 履歷！");
+    if (!jdResumeFile) return alert("請先上傳 PDF 履歷！");
     const jdText = document.getElementById("jobDescription")?.value.trim();
     if (!jdText) return alert("請貼上職缺描述 (JD)！");
 
@@ -539,7 +446,7 @@ async function analyzeResumeMatch() {
     btn.disabled = true;
 
     const formData = new FormData();
-    formData.append("resume_file", resumeFile);
+    formData.append("resume_file", jdResumeFile);
     formData.append("job_title", document.getElementById("jdJobTitle")?.value || "工程師");
     formData.append("company_name", document.getElementById("jdCompanyName")?.value || "科技公司");
     formData.append("job_description", jdText);
@@ -548,6 +455,9 @@ async function analyzeResumeMatch() {
         const response = await fetch(`${API_BASE}/interview/analyze-jd`, { method: "POST", body: formData });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
+
+        // 保留這次診斷的完整結果（含後端一併回傳的履歷文字/JD內容），供「確認儲存紀錄」使用
+        currentJdDiagnosisPayload = data;
 
         renderReport(data);
         showReportView();
@@ -570,8 +480,8 @@ function renderReport(data) {
     document.getElementById("jdMatchScore").innerText = score;
 
     const scoreLabel = document.getElementById("jdScoreLabel");
-    scoreLabel.innerText = score >= 80 ? "🔥 極佳契合" : (score >= 60 ? "⚠️ 具備面試資格" : "建議大幅修改");
-    scoreLabel.style.color = score >= 80 ? "#10b981" : (score >= 60 ? "#f59e0b" : "#f87171");
+    scoreLabel.innerText = score >= 80 ? "極佳契合" : (score >= 60 ? "具備面試資格" : "建議大幅修改");
+    scoreLabel.style.color = score >= 80 ? "#059669" : (score >= 60 ? "#D97706" : "#DC2626");
 
     // 2. 綜合短評
     document.getElementById("jdSummary").innerText = data.summary || data.advice || "分析完成。";
@@ -634,123 +544,198 @@ function showReportView() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// 「確認儲存紀錄」：把履歷文字、JD 內容、AI 診斷 JSON 打包送到後端存進 Supabase，成功後導向「履歷上傳紀錄」頁
+async function saveResumeDiagnosis() {
+    if (!currentJdDiagnosisPayload) return;
+
+    const saveBtn = document.getElementById("saveResumeBtn");
+    const discardBtn = document.getElementById("discardResumeBtn");
+    const statusEl = document.getElementById("resumeSaveStatus");
+    if (saveBtn) { saveBtn.innerText = "儲存中..."; saveBtn.disabled = true; }
+    if (discardBtn) discardBtn.disabled = true;
+    if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
+
+    // diagnosis_result 只保留 AI 分析結果本身，履歷文字/JD內容/職缺資訊已經是獨立欄位，不必重複存一份
+    const { resume_text, jd_text, job_title, company_name, ...diagnosisResult } = currentJdDiagnosisPayload;
+
+    const payload = {
+        job_title: job_title || document.getElementById("jdJobTitle")?.value || "工程師",
+        company_name: company_name || document.getElementById("jdCompanyName")?.value || "科技公司",
+        resume_text: resume_text || "",
+        jd_text: jd_text || document.getElementById("jobDescription")?.value || "",
+        match_score: currentJdDiagnosisPayload.match_score || 0,
+        diagnosis_result: diagnosisResult
+    };
+
+    try {
+        const response = await fetch(`${API_BASE}/resume/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`HTTP ${response.status}${errText ? ` - ${errText}` : ''}`);
+        }
+        window.location.href = "/frontend/pages/resume_records.html";
+    } catch (error) {
+        console.error("儲存履歷診斷紀錄失敗:", error);
+        if (statusEl) {
+            statusEl.textContent = `儲存失敗，請稍後再試 (${error.message})`;
+            statusEl.style.color = "#DC2626";
+        }
+        if (saveBtn) { saveBtn.innerText = "確認儲存紀錄"; saveBtn.disabled = false; }
+        if (discardBtn) discardBtn.disabled = false;
+    }
+}
+
+// 「捨棄並返回」：不儲存這次診斷結果，直接回到 JD 分析表單重新開始
+function discardResumeDiagnosis() {
+    currentJdDiagnosisPayload = null;
+    switchFeature('jd');
+}
+
 // ==========================================
 // 10. 產生與儲存報告 (Report & DB)
 // ==========================================
-async function generateReport() {
-    updateStatus("processing", "Analyzing Interview Data...");
-    if (startBtn) {
-        startBtn.innerText = "報告分析中...";
-        startBtn.disabled = true;
+// 面試戰場頁面 (interview_arena.html) 面試結束後，會把「已經 fetch 好」的報告資料
+// 存進 sessionStorage 並導回這裡，這個函式負責讀出來並還原成 currentReportPayload + 畫面渲染。
+// 回傳 true/false 表示「這次載入是否真的還原了一份報告」，讓呼叫端（DOMContentLoaded handler）
+// 可以據此判斷還要不要讓 router.js 的 ?feature= 網址判斷邏輯生效。
+function restorePendingInterviewReportIfAny() {
+    const raw = sessionStorage.getItem('pendingInterviewReport');
+    if (!raw) {
+        console.log('[app.js] sessionStorage 中沒有待顯示的面試報告（正常首次載入，或報告已還原過一次）');
+        return false;
     }
-
-    if (dialogueBox) {
-        dialogueBox.innerHTML += `<div class="system-text">> 面試結束，正在生成分析報告...</div>`;
-        dialogueBox.scrollTop = dialogueBox.scrollHeight;
-    }
-
-    const formData = buildBaseFormData();
-    formData.append("chat_history_str", JSON.stringify(chatHistory));
+    sessionStorage.removeItem('pendingInterviewReport');
 
     try {
-        const response = await fetch(reportUrl, { method: "POST", body: formData });
-        if (!response.ok) throw new Error("報告生成失敗");
-        const data = await response.json(); // 這裡的 data 現在包含 diagnostic 物件了
+        const { data, meta } = JSON.parse(raw);
+        console.log('[app.js] 還原待顯示的面試報告，data:', data, 'meta:', meta);
+        renderInterviewReportCard(data, meta);
+        return true;
+    } catch (error) {
+        console.error('還原面試報告失敗（sessionStorage 內容解析失敗）:', error, '原始內容:', raw);
+        return false;
+    }
+}
 
-        // 1. 建立當次面試的紀錄包 (包含診斷層資料)
-        currentReportPayload = {
-            job_title: formData.get("job_title"),
-            company_name: formData.get("company_name"),
-            total_score: data.total_score,
-            short_feedback: data.short_feedback,
-            detailed_scores: data.detailed_scores,
-            strengths: data.strengths,
-            improvements: data.improvements,
-            transcript: chatHistory,
-            resumeUrl: uploadedResumeUrl,
-            diagnostic: data.diagnostic // 把 AI 產出的診斷書帶進來
-        };
+// 渲染面試復盤報告卡片。data 是後端 /api/interview/report 回傳的分析結果，
+// meta 是這場面試的基本資訊 (job_title/company_name/transcript/resume_url)
+//
+// 🔥 關鍵修正：/api/interview/report 只保證「回傳合法 JSON」(response_format: json_object)，
+// 不保證 AI 一定完全照 prompt 要求的欄位結構回傳（可能漏欄位、型別不對）。
+// 之前這裡直接對 data.strengths / data.improvements 呼叫 .map()、對 data.detailed_scores
+// 呼叫 Object.entries()，一旦 AI 漏了任何一個欄位就會在渲染途中丟例外——
+// 但「切到 reportCard」的動作在最上面已經執行完了，導致使用者看到的是切換過去的
+// 空白報告卡片（畫面沒有任何錯誤提示，看起來就像「跳轉了但沒內容」）。
+// 現在全面補上防呆預設值，並把渲染主體包進 try/catch，寧可顯示不完整的內容或明確錯誤，
+// 也不要讓卡片切換過去之後卻悄悄卡在渲染到一半的狀態。
+function renderInterviewReportCard(data, meta) {
+    data = data || {};
+    meta = meta || {};
 
-        // ==========================================
-        // 1. 切換 UI：隱藏面試元件，顯示報告卡片
-        // ==========================================
-        document.getElementById('view-interview')?.classList.remove('active');
+    const safeStrengths = Array.isArray(data.strengths) ? data.strengths : [];
+    const safeImprovements = Array.isArray(data.improvements) ? data.improvements : [];
+    const safeDetailedScores = (data.detailed_scores && typeof data.detailed_scores === 'object') ? data.detailed_scores : {};
 
-        if (document.getElementById('setupCard')) document.getElementById('setupCard').style.display = 'none';
-        if (document.querySelector('.canvas-card')) document.querySelector('.canvas-card').style.display = 'none';
-        if (document.querySelector('.controls')) document.querySelector('.controls').style.display = 'none';
-        if (document.getElementById('dialogueBox')) document.getElementById('dialogueBox').style.display = 'none';
-        if (document.getElementById('inputModeToggle')) document.getElementById('inputModeToggle').style.display = 'none';
+    // 1. 建立當次面試的紀錄包 (包含診斷層資料)
+    currentReportPayload = {
+        job_title: meta.job_title,
+        company_name: meta.company_name,
+        total_score: data.total_score ?? 0,
+        short_feedback: data.short_feedback || '（AI 未提供摘要）',
+        detailed_scores: safeDetailedScores,
+        strengths: safeStrengths,
+        improvements: safeImprovements,
+        transcript: meta.transcript || [],
+        resumeUrl: meta.resume_url,
+        diagnostic: data.diagnostic // 把 AI 產出的診斷書帶進來
+    };
 
-        const reportCard = document.getElementById('reportCard');
-        if (reportCard) {
-            reportCard.classList.add('active');
-            reportCard.style.display = 'block';
-        }
+    // ==========================================
+    // 1. 切換 UI：隱藏設定卡片，顯示報告卡片
+    // ==========================================
+    document.getElementById('view-interview')?.classList.remove('active');
+    if (document.getElementById('setupCard')) document.getElementById('setupCard').style.display = 'none';
 
-        // 🔥 關鍵 UX 優化：將畫面平滑滾動到最上方，讓使用者第一眼看到自己的分數
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    const reportCard = document.getElementById('reportCard');
+    if (reportCard) {
+        reportCard.classList.add('active');
+        reportCard.style.display = 'block';
+    }
 
-        // ==========================================
-        // 2. 渲染資料
-        // ==========================================
+    // 🔥 關鍵 UX 優化：將畫面平滑滾動到最上方，讓使用者第一眼看到自己的分數
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // ==========================================
+    // 2. 渲染資料（包進 try/catch：任何欄位異常都不該讓卡片停在渲染一半的空白狀態）
+    // ==========================================
+    try {
         if (document.getElementById("detailRole")) document.getElementById("detailRole").innerText = `${currentReportPayload.job_title} - ${currentReportPayload.company_name}`;
-        if (document.getElementById("detailScore")) document.getElementById("detailScore").innerText = data.total_score;
-        if (document.getElementById("detailFeedback")) document.getElementById("detailFeedback").innerText = data.short_feedback;
-        if (document.getElementById("strengthsList")) document.getElementById("strengthsList").innerHTML = data.strengths.map(s => `<li>${s}</li>`).join("");
-        if (document.getElementById("improvementsList")) document.getElementById("improvementsList").innerHTML = data.improvements.map(i => `<li>${i}</li>`).join("");
+        if (document.getElementById("detailScore")) document.getElementById("detailScore").innerText = currentReportPayload.total_score;
+        if (document.getElementById("detailFeedback")) document.getElementById("detailFeedback").innerText = currentReportPayload.short_feedback;
+        if (document.getElementById("strengthsList")) {
+            document.getElementById("strengthsList").innerHTML = safeStrengths.length > 0
+                ? safeStrengths.map(s => `<li>${escapeHtml(s)}</li>`).join("")
+                : `<li style="color: var(--text-muted);">（無資料）</li>`;
+        }
+        if (document.getElementById("improvementsList")) {
+            document.getElementById("improvementsList").innerHTML = safeImprovements.length > 0
+                ? safeImprovements.map(i => `<li>${escapeHtml(i)}</li>`).join("")
+                : `<li style="color: var(--text-muted);">（無資料）</li>`;
+        }
 
         const skillsContainer = document.getElementById("skillsContainer");
         if (skillsContainer) {
-            skillsContainer.innerHTML = Object.entries(data.detailed_scores).map(([skill, score]) => `
+            const scoreEntries = Object.entries(safeDetailedScores);
+            skillsContainer.innerHTML = scoreEntries.length > 0
+                ? scoreEntries.map(([skill, score]) => `
                 <div class="skill-row" style="margin-bottom: 12px;">
                     <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:4px;">
-                        <span>${skill}</span><span style="color:var(--accent); font-family:monospace;">${score}%</span>
+                        <span>${escapeHtml(skill)}</span><span style="color:var(--accent); font-family:monospace;">${score}%</span>
                     </div>
-                    <div style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+                    <div style="width:100%; height:8px; background:var(--border); border-radius:4px; overflow:hidden;">
                         <div style="width: ${score}%; height:100%; background:var(--accent); border-radius:4px;"></div>
                     </div>
                 </div>
-            `).join("");
+            `).join("")
+                : `<p style="color: var(--text-muted); font-size: 14px;">（無評分資料）</p>`;
         }
 
         const transcriptBody = document.getElementById("transcriptBody");
         if (transcriptBody) {
-            transcriptBody.innerHTML = chatHistory.map(msg => {
+            transcriptBody.innerHTML = (currentReportPayload.transcript || []).map(msg => {
                 // 🔥 修正：OpenAI 的回覆 role 通常是 'assistant'
                 const isAI = msg.role === 'ai' || msg.role === 'assistant';
                 return `
-                <div class="msg-block ${msg.role}" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; background: ${isAI ? 'rgba(255,255,255,0.05)' : 'rgba(14,165,233,0.1)'};">
+                <div class="msg-block ${msg.role}" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; background: ${isAI ? 'var(--bg-input)' : 'rgba(30,58,138,0.06)'};">
                     <div style="font-size:12px; color:var(--text-muted); font-weight:bold; margin-bottom:4px;">${isAI ? 'SYSTEM (AI)' : 'YOU'}</div>
-                    <div style="font-size:14px; line-height:1.5;">${msg.content}</div>
+                    <div style="font-size:14px; line-height:1.5;">${escapeHtml(msg.content || '')}</div>
                 </div>
             `}).join("");
         }
-
-        // ==========================================
-        // 3. 注入控制按鈕與修煉區
-        // ==========================================
-        document.getElementById("reportActions")?.remove();
-        document.getElementById('reportCard').insertAdjacentHTML('beforeend', `
-            <div id="reportActions" style="margin-top: 40px; display: flex; gap: 16px; justify-content: center; padding-bottom: 40px;">
-                <button onclick="discardAndRetry()" style="padding: 12px 24px; border: 1px solid #f87171; color: #f87171; border-radius: 8px; cursor: pointer; background: transparent; font-weight:bold;">捨棄並重新面試</button>
-                <button id="saveBtn" onclick="saveReportToDB()" style="padding: 12px 24px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight:bold;">儲存並前往資料庫</button>
-            </div>
-        `);
-
-        // 觸發賽後修煉區
-        setTimeout(() => triggerGrowthZoneHook(currentReportPayload), 500);
-        if (currentReportPayload.diagnostic) {
-            console.log("偵測到報告，正在啟動診斷引擎...");
-            setTimeout(() => triggerGrowthZoneHook(currentReportPayload), 500);
-        } else {
-            console.warn("未偵測到診斷資料，可能後端未更新 Prompt。");
-        }
-
     } catch (error) {
-        updateStatus("error", "Report Failed.");
-        if (startBtn) { startBtn.innerText = "重新產生報告"; startBtn.disabled = false; }
+        console.error('渲染面試報告內容時發生例外:', error, '原始 data:', data);
+        const feedbackEl = document.getElementById("detailFeedback");
+        if (feedbackEl) feedbackEl.innerText = '報告內容解析異常，部分資訊可能無法顯示，請聯繫客服或重新面試。';
     }
+
+    // ==========================================
+    // 3. 注入控制按鈕與修煉區
+    // ==========================================
+    document.getElementById("reportActions")?.remove();
+    document.getElementById('reportCard').insertAdjacentHTML('beforeend', `
+        <div id="reportActions" style="margin-top: 40px; display: flex; gap: 16px; justify-content: center; padding-bottom: 40px;">
+            <button onclick="discardAndRetry()" style="padding: 12px 24px; border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; cursor: pointer; background: transparent; font-weight:bold;">捨棄並重新面試</button>
+            <button id="saveBtn" onclick="saveReportToDB()" style="padding: 12px 24px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight:bold;">儲存並前往資料庫</button>
+        </div>
+    `);
+
+    // 觸發賽後修煉區：只有「剛面試完的即時報告」會走到這裡觸發 AI 生成，
+    // 歷史檢視 (dashboard.html) 是另一條路徑，絕對不會呼叫這個函式
+    setTimeout(() => triggerGrowthZoneHook(currentReportPayload), 500);
 }
 
 let globalInterviewRecords = [];
@@ -758,7 +743,9 @@ let globalInterviewRecords = [];
 // 撈取歷史紀錄 (你原本可能在網頁載入時有呼叫這個)
 async function fetchInterviewHistory() {
     try {
-        const response = await fetch(`${API_BASE}/interview/history`);
+        const response = await fetch(`${API_BASE}/interview/history`, {
+            headers: await getAuthHeaders()
+        });
         const data = await response.json();
         globalInterviewRecords = data.records || [];
 
@@ -885,24 +872,28 @@ function showDetail(id) {
 async function saveReportToDB() {
     if (!currentReportPayload) return;
     const saveBtn = document.getElementById("saveBtn");
-    if (saveBtn) { saveBtn.innerText = "⏳ 儲存中..."; saveBtn.disabled = true; }
+    if (saveBtn) { saveBtn.innerText = "儲存中..."; saveBtn.disabled = true; }
 
-    if (dialogueBox) {
-        dialogueBox.innerHTML += `<div class="system-text">> 報告產生完畢，正在儲存至資料庫...</div>`;
-        dialogueBox.scrollTop = dialogueBox.scrollHeight;
-    }
+    // 把「能力升級區」目前已生成／完成的翻盤任務一併存入這筆面試紀錄
+    currentReportPayload.opportunities = (typeof RedemptionState !== 'undefined' && RedemptionState.opportunities && RedemptionState.opportunities.length > 0)
+        ? RedemptionState.opportunities
+        : null;
 
     try {
         const response = await fetch(`${API_BASE}/interview/save`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
             body: JSON.stringify(currentReportPayload)
         });
-        if (!response.ok) throw new Error("儲存失敗");
-        window.location.href = "dashboard.html";
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`HTTP ${response.status}${errText ? ` - ${errText}` : ''}`);
+        }
+        window.location.href = "/frontend/pages/dashboard.html";
     } catch (error) {
-        alert("資料庫連線失敗，但報告已產生。");
-        window.location.href = "dashboard.html";
+        console.error("儲存報告失敗:", error);
+        alert(`資料庫連線失敗，但報告已產生。\n(${error.message})`);
+        window.location.href = "/frontend/pages/dashboard.html";
     }
 }
 
@@ -914,37 +905,21 @@ function discardAndRetry() {
         reportCard.style.display = 'none';
     }
 
-    // 2. 將面試畫面的零件「顯示」回來
-    if (document.getElementById('setupCard')) document.getElementById('setupCard').style.display = 'block'; // 顯示設定卡片
-    if (document.querySelector('.canvas-card')) document.querySelector('.canvas-card').style.display = 'flex'; // 顯示視覺化聲波
-    if (document.querySelector('.controls')) document.querySelector('.controls').style.display = 'flex'; // 顯示按鈕區
-    if (document.getElementById('dialogueBox')) document.getElementById('dialogueBox').style.display = 'block'; // 顯示對話框
+    // 2. 顯示設定卡片，回到面試設定畫面
+    if (document.getElementById('setupCard')) document.getElementById('setupCard').style.display = 'flex';
     if (document.getElementById('view-interview')) document.getElementById('view-interview').classList.add('active');
 
-    // 3. 重置面試狀態與對話內容
-    chatHistory = [];
-    currentRound = 0;
-    isSetupMode = true;
+    // 3. 重置面試狀態
     currentReportPayload = null;
-
-    // 恢復對話框的預設文字
-    const dialogueBox = document.getElementById('dialogueBox');
-    if (dialogueBox) dialogueBox.innerHTML = '<div class="system-text">> awaiting user parameters...</div>';
 
     // 恢復開始按鈕狀態
     if (startBtn) {
-        startBtn.style.display = "flex";
         startBtn.disabled = false;
         startBtn.innerText = "INITIATE SEQUENCE";
+        checkInputs();
     }
-    if (stopBtn) stopBtn.style.display = 'none';
 
-    // 恢復輸入模式 (語音/文字) 的 UI
-    document.getElementById('textInputContainer')?.classList.add('hidden');
-    document.getElementById('voiceInputContainer')?.classList.remove('hidden');
-    if (document.getElementById('inputModeToggle')) document.getElementById('inputModeToggle').style.display = 'flex';
-
-    updateStatus("standby", "Standby");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ==========================================
@@ -959,88 +934,8 @@ const QUIZ_DATABASE = {
     }
 };
 
-// 🎯 入口：相容 Dashboard 呼叫，即時生成復仇任務
-async function triggerGrowthZoneHook(record) {
-    const zone = document.getElementById('growthZone');
-    if (!zone) {
-        console.error("找不到 ID 為 growthZone 的 HTML 元素！");
-        return;
-    }
-
-    // 確保區塊顯示並設定滾動條
-    zone.style.display = 'block';
-    zone.style.maxHeight = '80vh';
-    zone.style.overflowY = 'auto';
-    zone.style.padding = '16px';
-    zone.style.boxSizing = 'border-box';
-
-    // 兼容 Dashboard 傳來的舊命名 (role -> job_title, totalScore -> total_score)
-    const jobTitle = record.job_title || record.role || "目標職位";
-    const originalScore = record.total_score || record.totalScore || 0;
-
-    // 情況 A：如果資料裡面已經有生成好的 opportunities (未來資料庫更新後的完美情況)
-    if (record.opportunities && record.opportunities.length > 0) {
-        RedemptionState.originalScore = originalScore;
-        RedemptionState.jobTitle = jobTitle;
-        RedemptionState.opportunities = record.opportunities;
-        RedemptionState.clearedCount = 0;
-        renderRedemptionDashboard();
-        return;
-    }
-
-    // 情況 B：Dashboard 呼叫！只有對話紀錄 (transcript)，沒有分析結果
-    if (record.transcript && record.transcript.length > 0) {
-        // 先顯示炫酷的 Loading 畫面
-        zone.innerHTML = `
-            <div style="padding: 40px; text-align: center; color: var(--accent);">
-                <h2>正在回顧這場面試...</h2>
-                <p style="color: var(--text-muted);">正在分析歷史對話紀錄，為你萃取 3 個翻盤機會，請稍候</p>
-            </div>
-        `;
-
-        try {
-            // 準備資料發送給 Python 後端
-            const formData = new FormData();
-            formData.append("job_title", jobTitle);
-            formData.append("transcript_str", JSON.stringify(record.transcript));
-
-            // 呼叫我們剛剛寫好的 Python API
-            const response = await fetch(`${API_BASE}/growth/generate-redemption`, {
-                method: "POST",
-                body: formData
-            });
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-
-            // 拿到 AI 分析結果，寫入狀態
-            RedemptionState.originalScore = originalScore;
-            RedemptionState.jobTitle = jobTitle;
-            RedemptionState.opportunities = data.opportunities;
-            RedemptionState.clearedCount = 0;
-
-            // 渲染精美的復仇卡片
-            renderRedemptionDashboard();
-
-        } catch (error) {
-            console.error(error);
-            zone.innerHTML = `
-                <div style="padding: 24px; border: 1px solid #ef4444; border-radius: 8px; color: #ef4444;">
-                    無法生成復盤任務：${error.message}
-                </div>
-            `;
-        }
-        return;
-    }
-
-    // 情況 C：這筆歷史紀錄連對話 (transcript) 都沒有
-    zone.innerHTML = `
-        <div style="padding: 24px; text-align: center; border: 1px dashed var(--border-light); border-radius: 12px;">
-            <h3 style="color: var(--text-muted);">無法分析</h3>
-            <p style="color: var(--text-muted); font-size: 14px;">這筆歷史紀錄沒有保留對話內容，無法給予建議。</p>
-        </div>
-    `;
-}
+// 🎯 triggerGrowthZoneHook 的唯一定義在 growth-v2.js（負責「即時報告」生成 AI 翻盤任務），
+//    這裡不再重複定義，避免兩份邏輯不同步。
 
 function initGrowthZone(jobTitle, weaknessCode, worstAnswer, originalScore) {
     Object.assign(GrowthState, { jobTitle, weaknessCode, worstAnswer, originalScore, drillChatHistory: [], roundCount: 0 });
