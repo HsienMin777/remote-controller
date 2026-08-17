@@ -649,7 +649,7 @@
                     <div class="hero-left">
                         <h1 class="hero-greeting" id="overviewGreeting">您好</h1>
                         <p class="hero-subtitle">歡迎回來，準備好迎接下一場挑戰了嗎？</p>
-                        <button class="hero-cta" onclick="window.location.href='/frontend/pages/index.html'">
+                        <button class="hero-cta" onclick="window.location.href='/frontend/pages/interview.html'">
                             開始面試 Start Interview
                         </button>
                     </div>
@@ -698,7 +698,7 @@
             const BASE_PATH = '';
 
             if (featureName === 'interview' || featureName === 'jd') {
-                window.location.href = `${BASE_PATH}/frontend/pages/index.html?feature=${featureName}`;
+                window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${featureName}`;
                 return;
             }
             if (featureName === 'dashboard') {
@@ -791,7 +791,9 @@
         // 面試歷史紀錄：與 dashboard.html 共用同一份 API，同一批資料同時餵給
         // 「成長趨勢圖」與「最近面試紀錄走馬燈」使用
         // ---------------------------
-        const API_BASE_URL = "https://offerdash.onrender.com";
+        // 🔥 後端 /history 實際掛在 /api/interview/history，這裡漏掉 /api/interview
+        // 會 404 抓不到任何資料
+        const API_BASE_URL = "https://offerdash.onrender.com/api/interview";
         let realData = [];
         let trendChartInstance = null;
 

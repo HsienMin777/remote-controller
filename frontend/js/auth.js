@@ -91,14 +91,15 @@ function resetBtn() {
 }
 
 // 權限檢查 (Auth Guard)
-// 🔥 用絕對路徑 (/frontend/pages/login.html)，因為這支腳本被 frontend/pages/ 底下
-//    所有頁面共用載入，用絕對路徑才不會因為呼叫端頁面的相對位置不同而導到錯誤位置
+// 🔥 用絕對路徑 (/frontend/index.html)：登入頁已經從 frontend/pages/login.html
+//    搬到 frontend/index.html，且這支腳本被各個層級不同的頁面共用載入，
+//    用絕對路徑才不會因為呼叫端頁面的相對位置不同而導到錯誤位置
 window.checkAuthStatus = async function() {
     // 檢查登入狀態：使用 supabaseClient
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (!session) {
-        window.location.href = '/frontend/pages/login.html';
+        window.location.href = '/frontend/index.html';
         return null;
     }
     return session.user;
@@ -110,7 +111,7 @@ window.logout = async function() {
         console.log("正在執行登出...");
         // 登出：使用 supabaseClient
         await supabaseClient.auth.signOut();
-        window.location.href = '/frontend/pages/login.html';
+        window.location.href = '/frontend/index.html';
     } catch (err) {
         console.error("登出失敗:", err);
         alert("登出發生錯誤：" + err.message);

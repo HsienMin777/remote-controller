@@ -1,7 +1,10 @@
 // ==========================================
 // 1. 全域變數與 API 基礎設定 (Global Variables)
 // ==========================================
-const API_BASE = "https://offerdash.onrender.com";
+// 🔥 後端所有路由都掛在 /api 前綴下（見 backend/main.py 的 @app.post("/api/...") ），
+// 這裡漏掉 /api 會讓每一個用 API_BASE 組出來的請求都打到不存在的路徑 (404)——
+// 「AI 面試官初始化失敗」就是這樣來的：/interview/next 404，不是 GPT API 本身的問題。
+const API_BASE = "https://offerdash.onrender.com/api";
 const backendUrl = `${API_BASE}/interview/next`;
 
 // 流程控制變數
@@ -154,8 +157,8 @@ function toggleSidebar() {
 function switchFeature(featureName, options = {}) {
     const { updateHistory = true } = options;
 
-    // 0. 這些功能都是獨立頁面（不是 index.html 內部的 view-section），直接跳轉過去
-    // 🔥 用絕對路徑 (/frontend/pages/xxx.html)：index.html 現在也在 frontend/pages/ 底下，
+    // 0. 這些功能都是獨立頁面（不是 interview.html 內部的 view-section），直接跳轉過去
+    // 🔥 用絕對路徑 (/frontend/pages/xxx.html)：本頁 (interview.html) 也在 frontend/pages/ 底下，
     //    原本沒帶開頭斜線的相對路徑會被瀏覽器誤解成 frontend/pages/frontend/pages/xxx.html
     if (featureName === 'calendar') {
         window.location.href = '/frontend/pages/calendar.html';
@@ -200,8 +203,10 @@ function switchFeature(featureName, options = {}) {
     }
 
     // 3. 處理網址與歷史紀錄 (動態支援所有 feature)
+    // 🔥 這支頁面本身已經改名成 interview.html（原本叫 index.html），pushState 網址要
+    //    跟著改，不然重新整理/分享網址時瀏覽器實際去要的檔案跟目前載入的內容對不上
     if (updateHistory) {
-        const nextUrl = featureName === 'interview' ? 'index.html' : `index.html?feature=${featureName}`;
+        const nextUrl = featureName === 'interview' ? 'interview.html' : `interview.html?feature=${featureName}`;
         history.pushState({ feature: featureName }, '', nextUrl);
     }
 
@@ -500,24 +505,8 @@ function renderReport(data) {
         ? missing.map(s => `<span class="skill-pill miss">${s}</span>`).join('')
         : `<span style="font-size: 13px; color: var(--text-muted);">無明顯缺失關鍵字</span>`;
 
-    // 4. 改寫建議 (Before/After)
-    // ✍️ 區塊 3：渲染履歷改寫建議 (全面條列式)
-    const tips = data.resume_tips || [];
-    document.getElementById("jdResumeTips").innerHTML = tips.length > 0
-        ? tips.map((tip, i) => `
-        <div class="revision-card">
-            <div style="font-size: 12px; color: #f59e0b; font-weight: bold; margin-bottom: 8px;">
-                建議修改點 #${i + 1}
-            </div>
-            <div class="revision-before">原句：${tip.before}</div>
-            <div class="revision-after">建議：${tip.after}</div>
-            <div class="revision-reason" style="margin-top: 10px; font-size: 13px; color: var(--text-muted);">
-                <strong>AI 解析：</strong> ${tip.reason}
-            </div>
-        </div>`).join('')
-        : `<div class="revision-card">
-         <div class="revision-after">履歷已相當完整，目前無需重大修改。</div>
-       </div>`;
+    // 4. JD 總結與分析
+    document.getElementById("jdAnalysisSummary").innerText = data.jd_analysis_summary || "無 JD 分析內容。";
 
     // 5. 預測考題
     const questions = data.predicted_questions || [];

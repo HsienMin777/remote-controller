@@ -1,10 +1,10 @@
 // ==========================================
 // ⚔️ 面試戰場核心邏輯 (interview.js)
-// 負責：讀取 index.html 交棒過來的第一題 → 送出使用者回答 → 接收下一題 →
-//       結束時呼叫報告 API，並把結果交棒回 index.html 顯示復盤報告。
+// 負責：讀取 interview.html（原本叫 index.html）交棒過來的第一題 → 送出使用者回答 →
+//       接收下一題 → 結束時呼叫報告 API，並把結果交棒回 interview.html 顯示復盤報告。
 // ==========================================
 
-const INTERVIEW_API_BASE = 'http://127.0.0.1:8000/api';
+const INTERVIEW_API_BASE = 'https://offerdash.onrender.com/api';
 const REPORT_FETCH_TIMEOUT_MS = 60000; // 報告生成允許的最長等待時間，超過就視為逾時，不讓畫面卡死
 const NEXT_QUESTION_FETCH_TIMEOUT_MS = 45000; // 一般問答往返的逾時上限
 
@@ -36,7 +36,7 @@ window.onload = async () => {
     const raw = sessionStorage.getItem('interviewArenaState');
     if (!raw) {
         // 沒有面試狀態代表不是正常從首頁點擊「INITIATE SEQUENCE」進來的，導回首頁重新設定
-        window.location.href = '/frontend/pages/index.html';
+        window.location.href = '/frontend/pages/interview.html';
         return;
     }
 
@@ -44,7 +44,7 @@ window.onload = async () => {
         arenaState = JSON.parse(raw);
     } catch (error) {
         console.error('讀取面試狀態失敗:', error);
-        window.location.href = '/frontend/pages/index.html';
+        window.location.href = '/frontend/pages/interview.html';
         return;
     }
 
@@ -400,7 +400,7 @@ async function finishInterviewAndGenerateReport() {
     }));
     sessionStorage.removeItem('interviewArenaState');
 
-    window.location.href = '/frontend/pages/index.html?feature=interview';
+    window.location.href = '/frontend/pages/interview.html?feature=interview';
 }
 
 // 報告生成失敗時的統一收尾：結束 Loading 狀態、跳出明確錯誤 Toast，並在對話紀錄留下「重試」按鈕，

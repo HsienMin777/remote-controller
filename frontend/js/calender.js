@@ -2,7 +2,7 @@
 // 📅 面試管家核心邏輯 (calender.js)
 // ==========================================
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = 'https://offerdash.onrender.com/api';
 let allSchedules = []; // 全域快取所有行程資料
 let currentUserEmail = ''; // 登入使用者信箱，作為提醒信箱預設值
 
@@ -11,7 +11,7 @@ async function initCalendarSystem() {
     // 檢查是否登入 (supabaseClient 由 auth.js 建立)
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
-        window.location.href = '/frontend/pages/login.html'; // 若沒登入強制導回登入頁
+        window.location.href = '/frontend/index.html'; // 若沒登入強制導回登入頁
         return;
     }
 
@@ -25,7 +25,7 @@ async function initCalendarSystem() {
 
 async function logout() {
     await supabaseClient.auth.signOut();
-    window.location.href = '/frontend/pages/login.html';
+    window.location.href = '/frontend/index.html';
 }
 
 // ---------------------------
@@ -195,7 +195,7 @@ function prepareForBattle(event, id) {
 
         // 使用絕對路徑跳回主首頁，並直接切換到 AI 面試模擬模式
         const rootPath = window.location.origin;
-        window.location.href = `${rootPath}/frontend/pages/index.html?feature=interview`;
+        window.location.href = `${rootPath}/frontend/pages/interview.html?feature=interview`;
     }
 }
 

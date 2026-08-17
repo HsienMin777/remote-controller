@@ -16,10 +16,12 @@ const EXTERNAL_PAGES = {
     calendar: 'frontend/pages/calendar.html',
 };
 
-// 判斷路徑是否為首頁 (相容有無帶 index.html 的狀況)
+// 判斷路徑是否為「主頁/模擬面試頁」(interview.html，原本叫 index.html)。
+// 🔥 檔案改組後 "/" 與 "/index.html" 現在對應的是登入頁 (frontend/index.html)，不再是
+// 這裡，所以不能再靠 endsWith('/') 或 endsWith('/index.html') 判斷，改成直接比對新檔名。
 function isHomePath(path) {
     const p = path.toLowerCase();
-    return p.endsWith('/') || p.endsWith('/index.html') || p === BASE_PATH.toLowerCase() || p === `${BASE_PATH}/`.toLowerCase();
+    return p.endsWith('/interview.html');
 }
 
 function navigateTo(feature) {
@@ -66,10 +68,10 @@ function navigateTo(feature) {
 function executeRedirect(targetFeature) {
     if (targetFeature === 'interview') {
         // 回首頁且預設就是面試，不需要帶任何參數，保持網址最乾淨
-        window.location.href = `${BASE_PATH}/frontend/pages/index.html`;
+        window.location.href = `${BASE_PATH}/frontend/pages/interview.html`;
     } else {
         // 其他功能（calendar, jd, dashboard）精準帶上參數
-        window.location.href = `${BASE_PATH}/frontend/pages/index.html?feature=${targetFeature}`;
+        window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${targetFeature}`;
     }
 }
 

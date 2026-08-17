@@ -55,7 +55,7 @@ class ResumeDiagnosis(Base):
     resume_text = Column(Text)
     jd_text = Column(Text)
     match_score = Column(Integer)
-    diagnosis_result = Column(JSON)  # AI 產出的完整診斷 JSON (summary / matched_skills / missing_skills / resume_tips / predicted_questions / advice)
+    diagnosis_result = Column(JSON)  # AI 產出的完整診斷 JSON (summary / matched_skills / missing_skills / jd_analysis_summary / predicted_questions / advice)
 
 class ConsultantChatLog(Base):
     __tablename__ = "consultant_chat_logs"
@@ -372,47 +372,42 @@ async def analyze_jd(
         resume_text = extract_text_from_pdf(file_bytes)
         
         # 🔥 升級版 Prompt：要求 AI 輸出詳細且結構化的 JSON
-        SYSTEM_PROMPT = """
-你是頂尖的人資專家，請針對求職者的履歷與職缺描述 (JD) 進行深度 ATS 契合度比對。
+        SYSTEM_PROMPT = f"""
+        你是一位擁有 15 年經驗的頂尖跨領域人資專家 (Talent Acquisition Expert)，同時也是【{job_title}】領域的資深面試主管。
+        你的任務是針對求職者的履歷與職缺描述 (JD) 進行深度的 ATS 契合度比對與專業診斷。
 
-請務必回傳合法 JSON（不要加入 Markdown、不要加入 ```json）。
+        【輸入資訊】
+        - 目標職位：{job_title}
+        - 職缺描述 (JD)：{job_description}
+        - 求職者履歷：{safe_resume_text}
 
-JSON 格式如下：
+        【跨職業通用評估邏輯】
+        不論該職缺屬於何種產業或職能，請嚴格遵循以下邏輯進行分析：
+        1. 需求拆解：精準萃取該 JD 中要求的「硬實力 (工具/技術/專業知識)」、「軟實力 (溝通/管理/特質)」與「關鍵績效指標 (KPI/業務目標)」。
+        2. 證據比對：在履歷中尋找對應的具體證據。若履歷僅有形容詞卻缺乏具體事蹟或量化成果，應視為說服力不足。
+        3. 建設性疊加：不挑剔語病或排版，專注於「如何調整敘述角度，才能大幅提升該領域面試官的青睞」。
 
-{
-    "match_score": 0-100,
-    "summary": "一段 2-3 句的精準綜合短評，點出履歷優勢與 JD 要求的核心落差。",
-    "matched_skills": ["技能1", "技能2"],
-    "missing_skills": ["缺少的技能1", "缺少的技能2"],
-    "resume_tips": [
-        {
-            "before": "原始履歷內容",
-            "after": "優化後內容",
-            "reason": "說明這樣修改如何提升 ATS 關鍵字匹配率、可讀性或錄取機率"
-        }
-    ],
-    "predicted_questions": [
-        {
-            "q": "預測的專業考題",
-            "intent": "面試官為什麼要問這個？（考核重點）"
-        }
-    ],
-    "advice": "最終提醒，例如提醒面試時要著重哪個專案。"
-}
+        【防幻覺守則與嚴格限制】
+        1. 絕對不可捏造、猜測或延伸履歷中未提及的經歷。
+        2. `jd_analysis_summary` 欄位必須嚴格基於 JD 原文進行整理與客觀分析，嚴禁過度推測或延伸 JD 未提及的內容。請用約 100~150 字的一段話，精準整理該 JD 的核心內容，並客觀、簡要地分析該職位的重點要求與潛在挑戰。
+        3. 必須且只能回傳合法的 JSON 格式，絕對不要在前後加上 ```json 或是任何 Markdown 標籤與問候語。
 
-請遵守以下規則：
-
-1. match_score 必須介於 0~100。
-2. summary 控制在 2~3 句。
-3. matched_skills 至少列出 8 項（若不足則全部列出）。
-4. missing_skills 至少列出 8 項（若不足則全部列出）。
-5. resume_tips 必須提供 **7~10 項**，不得少於 7 項。
-6. 每一項 resume_tip 都必須包含 before、after、reason 三個欄位。
-7. before 與 after 必須是真正可以直接放進履歷的內容，而不是一句修改建議。
-8. predicted_questions 必須提供 **8~10 題**，並且每題都要有 intent。
-9. advice 至少提供 3 點具體建議，使用完整句子。
-10. 僅輸出 JSON，不要輸出任何其他文字。
-"""
+        【預期 JSON 輸出格式】
+        {{
+            "match_score": 85,
+            "summary": "2到3句精準短評，點出該職位最看重的優勢與核心落差。",
+            "matched_skills": ["技能1", "技能2", "技能3"],
+            "missing_skills": ["缺少的技能1", "缺少的技能2"],
+            "jd_analysis_summary": "一段約 100~150 字的內容，精準整理 JD 核心內容，並客觀簡要分析該職位的重點要求與潛在挑戰。",
+            "predicted_questions": [
+                {{
+                    "q": "結合 JD 需求與履歷盲點，預測該職業面試官會問的專業考題",
+                    "intent": "面試官問這題想考核的核心能力是什麼？"
+                }}
+            ],
+            "advice": "給予求職者在準備該職位面試時的 3 點具體策略建議。"
+        }}
+        """
         
         user_msg = f"公司：{company_name}\n職位：{job_title}\n\n【JD】\n{job_description}\n\n【履歷】\n{resume_text}"
 
@@ -724,22 +719,18 @@ async def generate_redemption(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# 🔥 index.html / login.html 現在已經搬進 frontend/pages/ 底下（跟其他分頁放一起），
-#    不再是專案根目錄的獨立檔案。但 "/" 與裸網址 "/index.html"／"/login.html"（不帶
-#    /frontend/pages/ 前綴）還是要繼續能訪問到——router.js 產生的網址是
-#    "index.html?feature=xxx" 這種形式而非 "/"，重新整理或直接訪問該網址時瀏覽器會真的
-#    發出請求；另外也保留舊網址相容性，避免任何還指向舊路徑的書籤/連結失效。
-#    實際檔案改讀 frontend/pages/ 底下的新位置，不用另外把整個專案根目錄掛上網路。
+# 🔥 檔案改組：原本的登入頁 (login.html) 搬到 frontend/index.html，變成真正字面意義上
+#    的「入口首頁」；原本的主頁/模擬面試頁 (index.html) 改名搬到 frontend/pages/interview.html，
+#    跟其他功能頁放在一起，不再享有根目錄的特殊地位。
+#    "/" 與裸網址 "/index.html"／"/login.html"（不帶 /frontend/ 前綴）都對應到新的登入頁，
+#    保留這幾個網址是為了相容任何還指向舊路徑的書籤/連結，避免直接 404。
 @app.get("/", include_in_schema=False)
 @app.get("/index.html", include_in_schema=False)
-async def serve_home():
-    return FileResponse(os.path.join(FRONTEND_DIR, "pages", "index.html"))
-
 @app.get("/login.html", include_in_schema=False)
 async def serve_login():
-    return FileResponse(os.path.join(FRONTEND_DIR, "pages", "login.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
-# frontend/ 底下的靜態資源掛在 /frontend，對應 frontend/pages/*.html（含現在也搬進來的
-# index.html/login.html）內「./../js/xxx.js」的相對路徑寫法，同時也讓
-# /frontend/pages/index.html、/frontend/pages/login.html 這種完整路徑能直接被訪問到。
+# frontend/ 底下的靜態資源掛在 /frontend，對應 frontend/index.html 與 frontend/pages/*.html
+# 內「./js/xxx.js」「./../js/xxx.js」的相對路徑寫法，同時也讓 /frontend/index.html、
+# /frontend/pages/interview.html 這種完整路徑能直接被訪問到。
 app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend-static")

@@ -900,7 +900,9 @@
             <script src="./../js/shared-footer.js"></script>
 
             <script>
-                const API_BASE_URL = "https://offerdash.onrender.com";
+                // 🔥 後端 /history 實際掛在 /api/interview/history，這裡漏掉 /api/interview
+                // 會 404 抓不到任何資料
+                const API_BASE_URL = "https://offerdash.onrender.com/api/interview";
                 let realData = [];
 
                 // 1. 初始化引擎
@@ -988,7 +990,7 @@
                         // Dashboard → 回主頁 (加上參數，讓首頁知道要打開哪個功能)
                         if (featureName === 'interview' || featureName === 'jd') {
                             // ✅ 修正：加上斜線與 BASE_PATH，強制讓瀏覽器清空子路徑，回到主頁
-                            window.location.href = `${BASE_PATH}/frontend/pages/index.html?feature=${featureName}`;
+                            window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${featureName}`;
                             return;
                         }
                     } else {
@@ -1299,7 +1301,9 @@
                 }
             </script>
             <script>
-                const API_BASE = "https://offerdash.onrender.com";
+                // 🔥 growth-v2.js 用這個組 /api/growth/... 與 /api/interview/{id}/opportunities，
+                // 漏掉 /api 會 404
+                const API_BASE = "https://offerdash.onrender.com/api";
                 const GrowthState = { jobTitle: "", weaknessCode: "", worstAnswer: "", originalScore: 0, drillChatHistory: [], roundCount: 0 };
             </script>
             <script src="./../js/growth-v2.js"></script>

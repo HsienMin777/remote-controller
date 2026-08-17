@@ -2,7 +2,7 @@
 // 📄 履歷上傳紀錄頁面邏輯 (resume_records.js)
 // ==========================================
 
-const RESUME_API_BASE = 'http://127.0.0.1:8000/api';
+const RESUME_API_BASE = 'https://offerdash.onrender.com/api';
 let allResumeRecords = [];
 
 window.onload = async () => {
@@ -60,7 +60,6 @@ function openResumeDiagnosisModal(id) {
 
     const matched = result.matched_skills || [];
     const missing = result.missing_skills || [];
-    const tips = result.resume_tips || [];
     const questions = result.predicted_questions || [];
 
     document.getElementById('modalBody').innerHTML = `
@@ -68,6 +67,12 @@ function openResumeDiagnosisModal(id) {
             <h3 style="margin: 0 0 8px 0; font-size: 15px; color: var(--text-main);">AI 綜合評估</h3>
             <p style="margin: 0; color: var(--text-muted); line-height: 1.6; font-size: 14px;">${escapeHtml(result.summary || result.advice || '無評語')}</p>
         </div>
+
+        ${result.jd_analysis_summary ? `
+        <div style="background: rgba(14, 165, 233, 0.05); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: var(--radius-md); padding: 20px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 15px; color: var(--accent);">JD 總結與分析</h3>
+            <p style="margin: 0; color: var(--text-muted); line-height: 1.7; font-size: 14px;">${escapeHtml(result.jd_analysis_summary)}</p>
+        </div>` : ''}
 
         <div>
             <h3 style="margin: 0 0 12px 0; font-size: 15px; color: var(--text-main);">關鍵字比對</h3>
@@ -84,20 +89,6 @@ function openResumeDiagnosisModal(id) {
                         ${missing.length > 0 ? missing.map(s => `<span class="skill-pill miss">${escapeHtml(s)}</span>`).join('') : '<span style="font-size:13px; color:var(--text-muted);">無</span>'}
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div>
-            <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #f59e0b;">履歷高分改寫建議</h3>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                ${tips.length > 0 ? tips.map((tip, i) => `
-                    <div class="revision-card">
-                        <div style="font-size: 12px; color: #f59e0b; font-weight: bold;">建議修改點 #${i + 1}</div>
-                        <div class="revision-before">原句：${escapeHtml(tip.before)}</div>
-                        <div class="revision-after">建議：${escapeHtml(tip.after)}</div>
-                        <div style="margin-top: 6px; font-size: 13px; color: var(--text-muted);"><strong>AI 解析：</strong>${escapeHtml(tip.reason)}</div>
-                    </div>
-                `).join('') : '<p style="color: var(--text-muted); font-size: 14px;">當時無重大修改建議。</p>'}
             </div>
         </div>
 
