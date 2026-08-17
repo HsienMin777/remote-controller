@@ -4,6 +4,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import List, Optional
@@ -13,6 +14,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # 共用的 DB engine / OpenAI client / Supabase client（見 db_clients.py 的說明）
 from db_clients import aclient, supabase_client, engine, SessionLocal, get_db
+
+# 使用者在前端 <input type="date">/<input type="time"> 填的一律是台灣本地時間（無時區資訊）。
+# Render 伺服器容器通常跑在 UTC，若直接用 datetime.now()（伺服器所在時區）去比對這些「純數字」時間，
+# 會整整差 8 小時，導致提醒信實際上要晚 8 小時才會寄出（或提早 8 小時，依當下 UTC/台灣時間差而定）。
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
 # ==========================================
 # 1. 初始化與資料庫設定
@@ -218,7 +224,8 @@ def _safe_parse_datetime(value, fmt):
 # 定義背景任務
 async def check_and_send_reminders():
     db = SessionLocal()
-    now = datetime.now()
+    # 取台灣當下時間並去掉 tzinfo，才能跟 reminder_time/date+time 這些「無時區」欄位直接比較
+    now = datetime.now(TAIPEI_TZ).replace(tzinfo=None)
     schedules = db.query(ScheduleModel).all()
 
     for sched in schedules:
