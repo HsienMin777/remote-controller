@@ -73,7 +73,9 @@ async function handleAuth(event) {
         if (error) throw error;
 
         // 成功後跳轉到登入後總覽主頁
-        window.location.href = '/frontend/pages/overview.html';
+        // 🔥 用相對路徑：這支函式只會在 frontend/index.html (登入頁，深度 0) 上執行，
+        //    才能同時在 Render (/frontend/...) 與 Vercel (直接掛在網域根目錄) 上正確導向
+        window.location.href = './pages/overview.html';
 
     } catch (err) {
         console.error('Auth Error:', err);
@@ -91,15 +93,15 @@ function resetBtn() {
 }
 
 // 權限檢查 (Auth Guard)
-// 🔥 用絕對路徑 (/frontend/index.html)：登入頁已經從 frontend/pages/login.html
-//    搬到 frontend/index.html，且這支腳本被各個層級不同的頁面共用載入，
-//    用絕對路徑才不會因為呼叫端頁面的相對位置不同而導到錯誤位置
+// 🔥 用相對路徑 (../index.html)：checkAuthStatus/logout 只會被 frontend/pages/*.html
+//    (深度 1) 呼叫，同一層級的相對路徑才能在 Render (/frontend/pages/...) 與
+//    Vercel (/pages/...，網站根目錄直接對應 frontend/) 兩種掛載方式下都正確導回登入頁
 window.checkAuthStatus = async function() {
     // 檢查登入狀態：使用 supabaseClient
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (!session) {
-        window.location.href = '/frontend/index.html';
+        window.location.href = '../index.html';
         return null;
     }
     return session.user;
@@ -111,7 +113,7 @@ window.logout = async function() {
         console.log("正在執行登出...");
         // 登出：使用 supabaseClient
         await supabaseClient.auth.signOut();
-        window.location.href = '/frontend/index.html';
+        window.location.href = '../index.html';
     } catch (err) {
         console.error("登出失敗:", err);
         alert("登出發生錯誤：" + err.message);

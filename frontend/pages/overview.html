@@ -649,7 +649,7 @@
                     <div class="hero-left">
                         <h1 class="hero-greeting" id="overviewGreeting">您好</h1>
                         <p class="hero-subtitle">歡迎回來，準備好迎接下一場挑戰了嗎？</p>
-                        <button class="hero-cta" onclick="window.location.href='/frontend/pages/interview.html'">
+                        <button class="hero-cta" onclick="window.location.href='interview.html'">
                             開始面試 Start Interview
                         </button>
                     </div>
@@ -695,30 +695,30 @@
 
         // 智慧區塊切換與路由邏輯：本頁是獨立頁面，其餘功能一律跳轉過去
         function switchFeature(featureName) {
-            const BASE_PATH = '';
-
+            // 🔥 用相對路徑：本頁與這些目標頁都在 frontend/pages/ 底下，同層相對路徑
+            //    在 Render (/frontend/pages/...) 與 Vercel (/pages/...) 都能正確解析
             if (featureName === 'interview' || featureName === 'jd') {
-                window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${featureName}`;
+                window.location.href = `interview.html?feature=${featureName}`;
                 return;
             }
             if (featureName === 'dashboard') {
-                window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                window.location.href = 'dashboard.html';
                 return;
             }
             if (featureName === 'resume-records') {
-                window.location.href = `${BASE_PATH}/frontend/pages/resume_records.html`;
+                window.location.href = 'resume_records.html';
                 return;
             }
             if (featureName === 'consultant') {
-                window.location.href = `${BASE_PATH}/frontend/pages/consultant.html`;
+                window.location.href = 'consultant.html';
                 return;
             }
             if (featureName === 'calendar') {
-                window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                window.location.href = 'calendar.html';
                 return;
             }
             if (featureName === 'settings') {
-                window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                window.location.href = 'settings.html';
                 return;
             }
 
@@ -800,7 +800,7 @@
         // 卡片渲染邏輯與 dashboard.html 的 renderCards() 完全一致，onclick 導去 dashboard 該筆詳細報告
         function buildRecordCardHtml(item) {
             return `
-                <div class="card" onclick="window.location.href='/frontend/pages/dashboard.html?record=${item.id}'">
+                <div class="card" onclick="window.location.href='dashboard.html?record=${item.id}'">
                     <div class="card-header">
                         <div class="card-role">${escapeHtml(item.role || '未定職位')}</div>
                         <div class="card-date">${escapeHtml(item.date || '未知時間')}</div>

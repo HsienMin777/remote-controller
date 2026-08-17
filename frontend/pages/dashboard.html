@@ -958,20 +958,20 @@
                 // 智慧區塊切換與路由邏輯 (支援跨網頁共用)
                 // ==========================================
                 function switchFeature(featureName) {
-                    // 🌍 [上線設定] 保持與全域 Router 一致，空字串代表網站架在網域根目錄
-                    const BASE_PATH = '';
+                    // 🔥 用相對路徑：本頁與這些目標頁都在 frontend/pages/ 底下，同層相對路徑
+                    //    在 Render (/frontend/pages/...) 與 Vercel (/pages/...) 都能正確解析
 
                     // 履歷上傳紀錄、AI 面試諮詢都是獨立頁面，不論目前在哪一頁都直接跳轉過去
                     if (featureName === 'resume-records') {
-                        window.location.href = `${BASE_PATH}/frontend/pages/resume_records.html`;
+                        window.location.href = 'resume_records.html';
                         return;
                     }
                     if (featureName === 'consultant') {
-                        window.location.href = `${BASE_PATH}/frontend/pages/consultant.html`;
+                        window.location.href = 'consultant.html';
                         return;
                     }
                     if (featureName === 'settings') {
-                        window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                        window.location.href = 'settings.html';
                         return;
                     }
 
@@ -979,25 +979,23 @@
                     const isDashboardPage = window.location.pathname.includes('dashboard.html');
 
                     // ==========================================
-                    // 🔄 跨頁切換 (透過絕對路徑強制擺脫子資料夾)
+                    // 🔄 跨頁切換
                     // ==========================================
                     if (isDashboardPage) {
                         // Dashboard → 行事曆是獨立頁面，直接跳轉過去
                         if (featureName === 'calendar') {
-                            window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                            window.location.href = 'calendar.html';
                             return;
                         }
                         // Dashboard → 回主頁 (加上參數，讓首頁知道要打開哪個功能)
                         if (featureName === 'interview' || featureName === 'jd') {
-                            // ✅ 修正：加上斜線與 BASE_PATH，強制讓瀏覽器清空子路徑，回到主頁
-                            window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${featureName}`;
+                            window.location.href = `interview.html?feature=${featureName}`;
                             return;
                         }
                     } else {
                         // 主頁 → Dashboard
                         if (featureName === 'dashboard') {
-                            // ✅ 修正：確保進入子網頁時也是走穩固的絕對根路徑
-                            window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                            window.location.href = 'dashboard.html';
                             return;
                         }
                     }

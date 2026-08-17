@@ -36,7 +36,7 @@ window.onload = async () => {
     const raw = sessionStorage.getItem('interviewArenaState');
     if (!raw) {
         // 沒有面試狀態代表不是正常從首頁點擊「INITIATE SEQUENCE」進來的，導回首頁重新設定
-        window.location.href = '/frontend/pages/interview.html';
+        window.location.href = 'interview.html';
         return;
     }
 
@@ -44,7 +44,7 @@ window.onload = async () => {
         arenaState = JSON.parse(raw);
     } catch (error) {
         console.error('讀取面試狀態失敗:', error);
-        window.location.href = '/frontend/pages/interview.html';
+        window.location.href = 'interview.html';
         return;
     }
 
@@ -400,7 +400,7 @@ async function finishInterviewAndGenerateReport() {
     }));
     sessionStorage.removeItem('interviewArenaState');
 
-    window.location.href = '/frontend/pages/interview.html?feature=interview';
+    window.location.href = 'interview.html?feature=interview';
 }
 
 // 報告生成失敗時的統一收尾：結束 Loading 狀態、跳出明確錯誤 Toast，並在對話紀錄留下「重試」按鈕，

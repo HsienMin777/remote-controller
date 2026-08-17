@@ -158,26 +158,27 @@ function switchFeature(featureName, options = {}) {
     const { updateHistory = true } = options;
 
     // 0. 這些功能都是獨立頁面（不是 interview.html 內部的 view-section），直接跳轉過去
-    // 🔥 用絕對路徑 (/frontend/pages/xxx.html)：本頁 (interview.html) 也在 frontend/pages/ 底下，
-    //    原本沒帶開頭斜線的相對路徑會被瀏覽器誤解成 frontend/pages/frontend/pages/xxx.html
+    // 🔥 用相對路徑 (xxx.html，不帶 /frontend 或任何前綴)：本頁 (interview.html) 與這些
+    //    目標頁都在 frontend/pages/ 底下，同層相對路徑不管是掛在 Render 的 /frontend/pages/...
+    //    還是 Vercel 直接對應 frontend/ 的 /pages/... 都能正確解析，不需要依賴部署路徑
     if (featureName === 'calendar') {
-        window.location.href = '/frontend/pages/calendar.html';
+        window.location.href = 'calendar.html';
         return;
     }
     if (featureName === 'dashboard') {
-        window.location.href = '/frontend/pages/dashboard.html';
+        window.location.href = 'dashboard.html';
         return;
     }
     if (featureName === 'resume-records') {
-        window.location.href = '/frontend/pages/resume_records.html';
+        window.location.href = 'resume_records.html';
         return;
     }
     if (featureName === 'consultant') {
-        window.location.href = '/frontend/pages/consultant.html';
+        window.location.href = 'consultant.html';
         return;
     }
     if (featureName === 'settings') {
-        window.location.href = '/frontend/pages/settings.html';
+        window.location.href = 'settings.html';
         return;
     }
 
@@ -379,7 +380,7 @@ async function handleMainAction() {
         };
         sessionStorage.setItem("interviewArenaState", JSON.stringify(arenaState));
 
-        window.location.href = "/frontend/pages/interview_arena.html";
+        window.location.href = "interview_arena.html";
     } catch (error) {
         console.error("初始化面試失敗:", error);
         alert("AI 面試官初始化失敗，請稍後再試。");
@@ -628,7 +629,7 @@ async function saveResumeDiagnosis() {
             const errText = await response.text().catch(() => '');
             throw new Error(`HTTP ${response.status}${errText ? ` - ${errText}` : ''}`);
         }
-        window.location.href = "/frontend/pages/resume_records.html";
+        window.location.href = "resume_records.html";
     } catch (error) {
         console.error("儲存履歷診斷紀錄失敗:", error);
         if (statusEl) {
@@ -940,11 +941,11 @@ async function saveReportToDB() {
             const errText = await response.text().catch(() => '');
             throw new Error(`HTTP ${response.status}${errText ? ` - ${errText}` : ''}`);
         }
-        window.location.href = "/frontend/pages/dashboard.html";
+        window.location.href = "dashboard.html";
     } catch (error) {
         console.error("儲存報告失敗:", error);
         alert(`資料庫連線失敗，但報告已產生。\n(${error.message})`);
-        window.location.href = "/frontend/pages/dashboard.html";
+        window.location.href = "dashboard.html";
     }
 }
 

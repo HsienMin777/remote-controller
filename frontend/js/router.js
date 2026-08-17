@@ -2,18 +2,14 @@
 // 🌍 全域智慧導航 (Smart Global Router) - 統一主控台版
 // ==========================================
 
-/**
- * [上線設定] 網站根目錄路徑
- * - 如果直接部署在網域根目錄 (例如 https://yourdomain.com/) -> 保持空字串 '' 即可。
- * - 如果部署在子資料夾 (例如 https://yourdomain.com/my-app/) -> 請設定為 '/my-app'。
- */
-const BASE_PATH = '';
-
 // 這些功能是「獨立實體頁面」，沒有對應的 view-xxx 區塊，必須真正跳轉網址
 // 其餘功能 (interview / jd / report) 一律視為首頁內部分頁，交給 switchFeature() 切換
+// 🔥 用相對路徑 (不帶 /frontend 前綴)：router.js 只會被 interview.html 載入，
+//    這些目標頁面跟它同樣位於 frontend/pages/ 底下，同層相對路徑在 Render
+//    (/frontend/pages/...) 與 Vercel (/pages/...) 兩種掛載方式下都能正確解析
 const EXTERNAL_PAGES = {
-    dashboard: 'frontend/pages/dashboard.html',
-    calendar: 'frontend/pages/calendar.html',
+    dashboard: 'dashboard.html',
+    calendar: 'calendar.html',
 };
 
 // 判斷路徑是否為「主頁/模擬面試頁」(interview.html，原本叫 index.html)。
@@ -39,7 +35,7 @@ function navigateTo(feature) {
             // 已經在目標頁面上了，交給該頁自己的 switchFeature 處理高亮，不需要重新整理
             if (typeof switchFeature === 'function') switchFeature(targetFeature);
         } else {
-            window.location.href = `${BASE_PATH}/${externalPage}`;
+            window.location.href = externalPage;
         }
         return;
     }
@@ -68,10 +64,10 @@ function navigateTo(feature) {
 function executeRedirect(targetFeature) {
     if (targetFeature === 'interview') {
         // 回首頁且預設就是面試，不需要帶任何參數，保持網址最乾淨
-        window.location.href = `${BASE_PATH}/frontend/pages/interview.html`;
+        window.location.href = 'interview.html';
     } else {
         // 其他功能（calendar, jd, dashboard）精準帶上參數
-        window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${targetFeature}`;
+        window.location.href = `interview.html?feature=${targetFeature}`;
     }
 }
 
@@ -105,7 +101,7 @@ function autoResolveHomeFeatureFromURL(options = {}) {
     // 萬一網址帶的是獨立頁面的 feature (例如 ?feature=dashboard)，首頁沒有對應區塊可切換，直接導過去
     const externalPage = EXTERNAL_PAGES[feature];
     if (externalPage) {
-        window.location.replace(`${BASE_PATH}/${externalPage}`);
+        window.location.replace(externalPage);
         return;
     }
 

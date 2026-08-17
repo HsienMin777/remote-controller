@@ -633,26 +633,26 @@
 
         // 智慧區塊切換與路由邏輯：本頁本身就是獨立頁面，其餘功能一律跳轉過去
         function switchFeature(featureName) {
-            const BASE_PATH = '';
-
+            // 🔥 用相對路徑：本頁與這些目標頁都在 frontend/pages/ 底下，同層相對路徑
+            //    在 Render (/frontend/pages/...) 與 Vercel (/pages/...) 都能正確解析
             if (featureName === 'interview' || featureName === 'jd') {
-                window.location.href = `${BASE_PATH}/frontend/pages/interview.html?feature=${featureName}`;
+                window.location.href = `interview.html?feature=${featureName}`;
                 return;
             }
             if (featureName === 'dashboard') {
-                window.location.href = `${BASE_PATH}/frontend/pages/dashboard.html`;
+                window.location.href = 'dashboard.html';
                 return;
             }
             if (featureName === 'calendar') {
-                window.location.href = `${BASE_PATH}/frontend/pages/calendar.html`;
+                window.location.href = 'calendar.html';
                 return;
             }
             if (featureName === 'consultant') {
-                window.location.href = `${BASE_PATH}/frontend/pages/consultant.html`;
+                window.location.href = 'consultant.html';
                 return;
             }
             if (featureName === 'settings') {
-                window.location.href = `${BASE_PATH}/frontend/pages/settings.html`;
+                window.location.href = 'settings.html';
                 return;
             }
 

@@ -21,7 +21,7 @@
                     style="background: transparent; border: none; color: var(--text-main); font-size: 24px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background 0.2s;">
                     ☰
                 </button>
-                <div class="logo" style="margin: 0; cursor: pointer;" onclick="window.location.href='/frontend/pages/overview.html'">
+                <div class="logo" style="margin: 0; cursor: pointer;" onclick="window.location.href='overview.html'">
                     <div class="logo-icon">O</div>
                     OfferDash
                 </div>
