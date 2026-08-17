@@ -51,6 +51,7 @@ function openAddScheduleModal(mode = 'add', id = null) {
             document.getElementById('schedJobTitle').value = sched.job_title;
             document.getElementById('schedDate').value = sched.date;
             document.getElementById('schedTime').value = sched.time;
+            document.getElementById('schedLocation').value = sched.location || '';
             document.getElementById('schedNotes').value = sched.notes || '';
             applyReminderFromSchedule(sched);
         }
@@ -224,6 +225,7 @@ async function submitScheduleForm(event) {
         time: document.getElementById('schedTime').value,
         candidate_email: currentUserEmail,
         reminder_time: reminderTime,
+        location: document.getElementById('schedLocation').value,
         notes: document.getElementById('schedNotes').value
     };
 

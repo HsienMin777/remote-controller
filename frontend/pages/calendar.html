@@ -587,13 +587,13 @@
             <div class="container">
                 <!-- 🌟 與「履歷與 JD 契合度診斷」頁完全一致的排版：hero 標題 + 玻璃卡片內容區 -->
                 <div class="hero">
-                    <h1>面試管家</h1>
-                    <p>掌握每一場面試的關鍵時刻，提醒信與戰前加油信將自動寄至 <span id="userEmail" style="color: var(--accent);"></span></p>
+                    <h1>面試行程</h1>
+                    <p>掌握每一場面試的關鍵時刻</p>
                 </div>
 
                 <div class="setup-card">
                     <div class="card-header">
-                        <h3>即將到來的挑戰</h3>
+                        <h3>即將到來的面試</h3>
                         <button class="btn btn-primary" onclick="openAddScheduleModal()">+ 新增排程</button>
                     </div>
 
@@ -655,8 +655,13 @@
                 </div>
 
                 <div class="input-group">
+                    <label>地點 / 連結</label>
+                    <input type="text" id="schedLocation" class="input-field" placeholder="例如：台北市信義區... 或 Google Meet 連結">
+                </div>
+
+                <div class="input-group">
                     <label>備註</label>
-                    <textarea id="schedNotes" class="input-field" rows="4" placeholder="例如：面試地點、需攜帶文件、注意事項..." style="resize: vertical;"></textarea>
+                    <textarea id="schedNotes" class="input-field" rows="4" placeholder="例如：需攜帶文件、注意事項..." style="resize: vertical;"></textarea>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid var(--border);">
