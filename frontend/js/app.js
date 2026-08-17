@@ -517,6 +517,66 @@ function renderReport(data) {
                 <div class="q-intent">面試官意圖：${q.intent || "專業能力測試"}</div>
             </div>`).join('')
         : `<div class="question-card"><div class="q-title">無特定預測考題</div></div>`;
+
+    // 6. 原始檔案預覽 (預設收合)
+    const previewWrap = document.getElementById("resumeFilePreview");
+    previewWrap.classList.remove("is-open");
+    previewWrap.style.display = "none";
+    document.getElementById("resumeFilePreviewIframe").style.display = "none";
+    document.getElementById("resumeFilePreviewImg").style.display = "none";
+    document.getElementById("toggleResumeTextBtn").innerText = "查看原始檔案";
+}
+
+let currentResumeObjectUrl = null;
+const RESUME_PREVIEW_TRANSITION_MS = 350;
+
+function toggleResumeTextView() {
+    const previewWrap = document.getElementById("resumeFilePreview");
+    const iframeEl = document.getElementById("resumeFilePreviewIframe");
+    const imgEl = document.getElementById("resumeFilePreviewImg");
+    const toggleBtn = document.getElementById("toggleResumeTextBtn");
+
+    const isOpen = previewWrap.classList.contains("is-open");
+
+    if (isOpen) {
+        // 淡出後再真正隱藏，讓 CSS transition 有時間播放
+        previewWrap.classList.remove("is-open");
+        toggleBtn.innerText = "📄 查看原始檔案";
+        setTimeout(() => { previewWrap.style.display = "none"; }, RESUME_PREVIEW_TRANSITION_MS);
+        return;
+    }
+
+    const file = jdResumeFile;
+    if (!file) {
+        alert("找不到剛才上傳的檔案，請重新上傳履歷後再試一次。");
+        return;
+    }
+
+    if (currentResumeObjectUrl) {
+        URL.revokeObjectURL(currentResumeObjectUrl);
+    }
+    currentResumeObjectUrl = URL.createObjectURL(file);
+
+    iframeEl.style.display = "none";
+    imgEl.style.display = "none";
+
+    if (file.type === "application/pdf") {
+        iframeEl.src = currentResumeObjectUrl;
+        iframeEl.style.display = "block";
+    } else if (file.type.startsWith("image/")) {
+        imgEl.src = currentResumeObjectUrl;
+        imgEl.style.display = "block";
+    } else {
+        alert("不支援預覽此檔案類型。");
+        return;
+    }
+
+    // 先設定 display 讓元素進入版面，再於下一幀加上 is-open 觸發淡入 + 下滑動畫
+    previewWrap.style.display = "block";
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => previewWrap.classList.add("is-open"));
+    });
+    toggleBtn.innerText = "收起原始檔案";
 }
 
 function showReportView() {
