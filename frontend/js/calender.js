@@ -15,8 +15,9 @@ async function initCalendarSystem() {
         return;
     }
 
-    // 顯示使用者名稱
-    document.getElementById('userEmail').innerText = user.email || '';
+    // 顯示使用者名稱 (calendar.html 目前沒有 #userEmail 元素，做防呆避免整個初始化流程被中斷)
+    const userEmailEl = document.getElementById('userEmail');
+    if (userEmailEl) userEmailEl.innerText = user.email || '';
     currentUserEmail = user.email || '';
 
     // 載入該使用者的排程 (確保後端 SQL 都有篩選 user_id)
