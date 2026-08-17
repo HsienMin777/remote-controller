@@ -379,7 +379,7 @@ async def analyze_jd(
         【輸入資訊】
         - 目標職位：{job_title}
         - 職缺描述 (JD)：{job_description}
-        - 求職者履歷：{safe_resume_text}
+        - 求職者履歷：{resume_text}
 
         【跨職業通用評估邏輯】
         不論該職缺屬於何種產業或職能，請嚴格遵循以下邏輯進行分析：
