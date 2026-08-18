@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <script src="./../js/theme-init.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>模擬面試進行中</title>
     <style>
         /* 🌟 Clean B2B / Fintech 風格（與 index.html / calendar.html 完全一致的設計變數） */
@@ -68,7 +68,12 @@
             color: var(--text-main);
             -webkit-font-smoothing: antialiased;
             width: 100vw;
+            /* 🔥 手機瀏覽器的網址列/工具列會動態顯示或收合，固定的 100vh 不會跟著縮放，
+               導致底下的回答輸入框被裁到視覺可視範圍之外——疊加 body 的 overflow:hidden
+               後完全無法捲動過去，就會出現「點不到、聚焦不了」的狀況。
+               100dvh 會隨瀏覽器 UI／虛擬鍵盤顯示狀態即時調整，100vh 僅作為舊瀏覽器 fallback。 */
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
             box-sizing: border-box;
         }
@@ -103,6 +108,7 @@
             top: 0;
             left: 0;
             height: 100vh;
+            height: 100dvh;
             width: 260px;
             background: var(--glass-bg);
             backdrop-filter: blur(12px);
@@ -130,6 +136,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             background: var(--overlay-bg);
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
@@ -156,6 +163,67 @@
                 width: 260px;
                 transform: translateX(-100%);
                 padding: 32px 20px;
+            }
+        }
+
+        /* 📱 手機版 RWD：縮小固定 header 與間距、讓輸入框與按鈕更好點、
+           對話泡泡改用更多寬度、Toast 貼齊左右邊緣避免溢出螢幕 */
+        @media (max-width: 600px) {
+            header {
+                height: 60px;
+                padding: 0 16px;
+            }
+
+            .main-content {
+                padding-top: 76px;
+            }
+
+            .arena-container {
+                padding: 0 12px 16px;
+            }
+
+            .arena-chat-log {
+                padding: 16px;
+            }
+
+            .msg-block {
+                max-width: 92%;
+            }
+
+            .arena-answer-area {
+                padding: 14px;
+            }
+
+            #answerInput {
+                min-height: 90px;
+                padding-right: 60px;
+            }
+
+            .mic-btn {
+                width: 40px;
+                height: 40px;
+            }
+
+            .arena-answer-footer {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            #submitAnswerBtn {
+                width: 100%;
+                padding: 14px;
+            }
+
+            #arenaStatusText {
+                order: 2;
+                text-align: center;
+            }
+
+            .arena-toast {
+                left: 16px;
+                right: 16px;
+                bottom: 16px;
+                max-width: none;
             }
         }
 
@@ -498,7 +566,9 @@
             background: var(--bg-input);
             color: var(--text-main);
             font-family: inherit;
-            font-size: 15px;
+            /* 🔥 iOS Safari 對 font-size < 16px 的欄位聚焦時會自動放大整個頁面畫面，
+               容易讓人誤以為「點了沒反應」，統一設為 16px 避免觸發自動縮放 */
+            font-size: 16px;
             line-height: 1.6;
             resize: vertical;
             box-sizing: border-box;
