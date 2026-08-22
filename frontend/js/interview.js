@@ -258,10 +258,15 @@ function playAISpeech(base64Audio, isFinalMessage) {
     }
     statusText.innerText = 'AI 面試官發言中...';
     aiPlayer.src = `data:audio/mp3;base64,${base64Audio}`;
-    aiPlayer.play().catch(() => {}); // 瀏覽器可能封鎖自動播放，不影響文字流程
     aiPlayer.onended = () => onAISpeechEnded(isFinalMessage);
     // 保險：萬一 onended 因某些瀏覽器/音檔異常而沒有觸發，也不該讓使用者永遠卡住無法輸入
     aiPlayer.onerror = () => onAISpeechEnded(isFinalMessage);
+    // 🔥 手機瀏覽器常見的自動播放政策會直接拒絕 play()（尤其是 iOS Safari，
+    // 使用者互動與 fetch 回應之間隔了一段非同步時間就可能被視為「非使用者直接觸發」）。
+    // 一旦被拒絕，音檔根本沒開始播放，onended/onerror 永遠不會觸發，畫面就會卡死在
+    // 「AI 面試官發言中...」、輸入框永遠打不開。原本的 .catch(() => {}) 把這個錯誤吃掉，
+    // 卻沒有讓文字/輸入流程照樣往下走，這裡改成：播放失敗就直接視同「講完了」繼續往下。
+    aiPlayer.play().catch(() => onAISpeechEnded(isFinalMessage));
 }
 
 function onAISpeechEnded(isFinalMessage) {
