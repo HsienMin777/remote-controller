@@ -3,8 +3,13 @@ import json
 import base64
 import mimetypes
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from io import BytesIO
 from typing import Optional
+
+# 使用者所在地一律視為台灣 (UTC+8)；伺服器容器通常跑在 UTC，「今天」的判斷若直接用
+# datetime.utcnow() 會在台灣時間每天早上 8 點才重置額度，而不是台灣的午夜 0 點。
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
 # 🔥 Windows 的登錄檔常把 .js 對應到 text/plain，導致靜態檔案被送錯 MIME type，
 #    這裡強制覆寫成正確的 JavaScript MIME type。
@@ -546,12 +551,16 @@ def get_resume_history(db: Session = Depends(get_db), user_id: str = Depends(get
 # 6. AI 面試諮詢室 (Consultant) — 成本防護 + 背景上下文注入
 # ==========================================
 
-# 計算某位使用者「今天」(UTC) 已經發問幾次，作為每日額度依據
+# 計算某位使用者「今天」已經發問幾次，作為每日額度依據
+# 🔥 「今天」以台灣時間的午夜為界：created_at 存的是 naive UTC 時間，若直接拿
+#    datetime.utcnow() 的午夜去比對，額度會在台灣時間每天早上 8 點才重置，
+#    而不是使用者體感的「隔天」。這裡先算出台灣午夜，再換算回 UTC 做比對。
 def _get_consultant_usage_today(db: Session, user_id: str) -> int:
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    taipei_midnight = datetime.now(TAIPEI_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = taipei_midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
     return (
         db.query(ConsultantChatLog)
-        .filter(ConsultantChatLog.user_id == user_id, ConsultantChatLog.created_at >= today_start)
+        .filter(ConsultantChatLog.user_id == user_id, ConsultantChatLog.created_at >= today_start_utc)
         .count()
     )
 
