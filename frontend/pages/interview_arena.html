@@ -533,6 +533,35 @@
             margin-top: 1px;
         }
 
+        /* 🔊 語音解鎖提示：手機瀏覽器常見的自動播放政策會擋掉頁面載入當下就想播放的 AI 語音，
+           必須靠使用者一次真正的點擊手勢才能「解鎖」<audio> 元素，之後同一顆元素才能繼續自動播放。
+           預設隱藏，只有偵測到 play() 真的被拒絕時才會顯示（見 interview.js 的 playAISpeech）。 */
+        #audioUnlockBtn {
+            display: none;
+            position: fixed;
+            top: 88px;
+            left: 50%;
+            transform: translateX(-50%);
+            align-items: center;
+            gap: 8px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 100px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.3);
+            z-index: 60;
+            animation: audioUnlockPulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes audioUnlockPulse {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.04); }
+        }
+
         .arena-toast.toast-error .toast-icon {
             color: #FCA5A5;
         }
@@ -714,6 +743,7 @@
 
     <audio id="aiPlayer" style="display: none;"></audio>
     <div id="arenaToast" class="arena-toast"></div>
+    <button id="audioUnlockBtn" type="button" onclick="unlockAudioPlayback()">🔊 點擊以啟用 AI 面試官語音</button>
 
     <!-- 載入 Supabase SDK 與共用登入邏輯 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

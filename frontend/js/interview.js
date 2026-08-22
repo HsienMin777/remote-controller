@@ -257,6 +257,7 @@ function playAISpeech(base64Audio, isFinalMessage) {
         return;
     }
     statusText.innerText = 'AI 面試官發言中...';
+    hideAudioUnlockPrompt(); // 每次開始新的一句都先收起上一輪可能殘留的解鎖提示
     aiPlayer.src = `data:audio/mp3;base64,${base64Audio}`;
     aiPlayer.onended = () => onAISpeechEnded(isFinalMessage);
     // 保險：萬一 onended 因某些瀏覽器/音檔異常而沒有觸發，也不該讓使用者永遠卡住無法輸入
@@ -265,8 +266,32 @@ function playAISpeech(base64Audio, isFinalMessage) {
     // 使用者互動與 fetch 回應之間隔了一段非同步時間就可能被視為「非使用者直接觸發」）。
     // 一旦被拒絕，音檔根本沒開始播放，onended/onerror 永遠不會觸發，畫面就會卡死在
     // 「AI 面試官發言中...」、輸入框永遠打不開。原本的 .catch(() => {}) 把這個錯誤吃掉，
-    // 卻沒有讓文字/輸入流程照樣往下走，這裡改成：播放失敗就直接視同「講完了」繼續往下。
-    aiPlayer.play().catch(() => onAISpeechEnded(isFinalMessage));
+    // 卻沒有讓文字/輸入流程照樣往下走，這裡改成：播放失敗就直接視同「講完了」繼續往下，
+    // 同時彈出「點擊以啟用語音」按鈕，讓使用者用一次真正的點擊手勢解鎖這顆 <audio> 元素——
+    // 解鎖後同一個元素之後就能繼續自動播放，不必每一題都手動點。
+    aiPlayer.play().catch(() => {
+        showAudioUnlockPrompt();
+        onAISpeechEnded(isFinalMessage);
+    });
+}
+
+// 手機瀏覽器封鎖自動播放時彈出的提示按鈕；只要使用者點一次，這顆 <audio> 元素就會被瀏覽器
+// 視為「已透過使用者手勢啟用」，之後題目的語音就能繼續正常自動播放，不需要每題都點。
+function showAudioUnlockPrompt() {
+    const btn = document.getElementById('audioUnlockBtn');
+    if (btn) btn.style.display = 'flex';
+}
+
+function hideAudioUnlockPrompt() {
+    const btn = document.getElementById('audioUnlockBtn');
+    if (btn) btn.style.display = 'none';
+}
+
+function unlockAudioPlayback() {
+    hideAudioUnlockPrompt();
+    // 重新嘗試播放目前 aiPlayer 裡的音檔（若還沒播完）；即使這句話已經講完，
+    // 這次點擊本身也足以解鎖這顆元素，之後的題目就能自動播放語音了
+    aiPlayer.play().catch(() => {});
 }
 
 function onAISpeechEnded(isFinalMessage) {
