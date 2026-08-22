@@ -24,9 +24,11 @@ async function initCalendarSystem() {
     loadSchedules(user.id);
 }
 
+// 🔥 登出後導向 overview.html（而非登入頁）：該頁現在是訪客也能瀏覽的頁面殼，
+//    未登入時會自動鎖定需要帳號的功能（見 overview.html 的 applyGuestLockedSidebar()）
 async function logout() {
     await supabaseClient.auth.signOut();
-    window.location.href = '../index.html';
+    window.location.href = 'overview.html';
 }
 
 // ---------------------------
