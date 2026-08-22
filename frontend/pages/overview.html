@@ -180,46 +180,6 @@
         .submenu-item:hover { background: var(--hover-tint); color: var(--text-main); }
         .submenu-item.active { background: var(--active-tint); color: var(--accent); font-weight: 600; }
 
-        /* 🔒 封印樣式：未登入的訪客看到側邊欄這些功能時呈現半透明、不可用的視覺提示，
-           點擊不會導頁，只會彈出「請先登入」提示（見 guestLockedToast + lockMenuItem()） */
-        .locked-feature {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .locked-feature:hover {
-            background: transparent;
-            color: var(--text-muted);
-        }
-
-        .locked-feature .submenu-arrow {
-            display: none;
-        }
-
-        #guestLockedToast {
-            position: fixed;
-            left: 50%;
-            bottom: 32px;
-            transform: translateX(-50%) translateY(20px);
-            background: #141414;
-            color: #FAFAFA;
-            padding: 12px 20px;
-            border-radius: var(--radius-md);
-            font-size: 14px;
-            font-weight: 600;
-            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.4);
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            white-space: nowrap;
-        }
-
-        #guestLockedToast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
         .main-content {
             width: 100%;
             flex: 1;
@@ -958,57 +918,21 @@
             });
         }
 
-        // ---------------------------
-        // 🔒 訪客封印機制：AI 諮詢師 / 行事曆 / 儀表板與歷史紀錄 / 設定
-        // 這 4 項功能需要帳號才有意義（聊天紀錄、行事曆提醒信、歷史數據、個人設定），
-        // 未登入時讓側邊欄對應項目呈現半透明鎖定樣式，點擊只原地提示、不導頁。
-        // ---------------------------
-        const LOCKED_MENU_IDS = ['menu-consultant', 'menu-calendar', 'menu-dashboard', 'menu-settings', 'submenu-dashboard', 'submenu-resume-records'];
-
-        function lockMenuItem(el) {
-            if (!el) return;
-            el.classList.add('locked-feature');
-            // 直接覆蓋 onclick：不論原本是 switchFeature(...) 還是 toggleSidebarSubmenu(...)，
-            // 賦值會整個取代掉，訪客點擊就只會觸發下面的提示，不會導頁或展開子選單
-            el.onclick = (event) => {
-                event.stopPropagation();
-                showGuestLockedToast();
-            };
-        }
-
-        function applyGuestLockedSidebar() {
-            LOCKED_MENU_IDS.forEach(id => lockMenuItem(document.getElementById(id)));
-
-            // 訪客（含剛登出）沒有「登出」的必要，側邊欄底部改顯示「登入」，點擊進 index.html 登入
-            const logoutEl = document.getElementById('menu-logout');
-            if (logoutEl) {
-                logoutEl.innerText = '登入';
-                logoutEl.onclick = () => { window.location.href = '../index.html'; };
-            }
-        }
-
-        let guestToastTimer = null;
-        function showGuestLockedToast() {
-            const toast = document.getElementById('guestLockedToast');
-            if (!toast) return;
-            toast.innerText = '🔒 請先登入才能使用此功能';
-            toast.classList.add('show');
-            clearTimeout(guestToastTimer);
-            guestToastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
-        }
-
         // 問候語：優先使用「設定」頁面存的顯示名稱，沒設定過就退回顯示登入信箱
+        // 🔥 側邊欄的訪客封印狀態（AI 諮詢師/行事曆/儀表板/設定變半透明、登出變登入）
+        // 現在統一交給 shared-sidebar.js 的 applySidebarGuestState() 集中處理，
+        // 確保訪客不論停在哪個開放頁面（overview / interview / interview_arena）
+        // 看到的側邊欄狀態都一致，這裡只需要處理本頁自己的個人化內容
         window.onload = async () => {
             // 視差滾動是純視覺效果，訪客／登入者都套用
             initHeroParallax();
 
             // 🔥 這裡改用不會強制導頁的 getSession()：overview.html 現在是訪客也能瀏覽的頁面殼，
-            // 未登入時只鎖定需要帳號的功能，不再像其他頁面一樣被 checkAuthStatus() 導回登入頁
+            // 未登入時只顯示訪客版內容，不再像其他頁面一樣被 checkAuthStatus() 導回登入頁
             const { data: { session } } = await supabaseClient.auth.getSession();
             const user = session?.user || null;
 
             if (!user) {
-                applyGuestLockedSidebar();
                 renderRecordsCarousel(); // realData 維持空陣列，會顯示既有的「尚無紀錄」空狀態
                 initTrendChart();
                 return;
@@ -1046,8 +970,6 @@
             initTrendChart();
         };
     </script>
-
-    <div id="guestLockedToast"></div>
 </body>
 
 </html>

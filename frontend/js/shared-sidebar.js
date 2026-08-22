@@ -63,3 +63,88 @@ function toggleSidebarSubmenu(event, el) {
     const group = el.closest('.menu-item-group');
     if (group) group.classList.toggle('open');
 }
+
+// ==========================================
+// 🔒 訪客封印機制（集中在共用元件處理）
+// AI 面試諮詢師 / 行事曆 / 儀表板與歷史紀錄 / 設定 這 4 項功能需要帳號才有意義。
+// 🔥 這裡集中判斷登入狀態並套用鎖定樣式，而不是讓每個頁面各自實作——
+// 之前只在 overview.html 處理過，訪客導到 interview.html／interview_arena.html
+// （這兩頁現在開放訪客直接試用）時側邊欄卻沒同步套用鎖定，看起來像「變回登入狀態」。
+// 統一由這支共用腳本處理，才能確保訪客在任何一頁看到的側邊欄狀態永遠一致。
+// ==========================================
+const LOCKED_MENU_IDS = ['menu-consultant', 'menu-calendar', 'menu-dashboard', 'menu-settings', 'submenu-dashboard', 'submenu-resume-records'];
+
+function ensureGuestLockStyles() {
+    if (document.getElementById('guestLockStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'guestLockStyles';
+    style.textContent = `
+        .locked-feature { opacity: 0.5; cursor: not-allowed; }
+        .locked-feature:hover { background: transparent; color: var(--text-muted); }
+        .locked-feature .submenu-arrow { display: none; }
+        #guestLockedToast {
+            position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
+            background: #141414; color: #FAFAFA; padding: 12px 20px; border-radius: var(--radius-md, 12px);
+            font-size: 14px; font-weight: 600; box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.4);
+            opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000; white-space: nowrap;
+        }
+        #guestLockedToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    `;
+    document.head.appendChild(style);
+
+    if (!document.getElementById('guestLockedToast')) {
+        const toast = document.createElement('div');
+        toast.id = 'guestLockedToast';
+        document.body.appendChild(toast);
+    }
+}
+
+let guestToastTimer = null;
+function showGuestLockedToast() {
+    const toast = document.getElementById('guestLockedToast');
+    if (!toast) return;
+    toast.innerText = '🔒 請先登入才能使用此功能';
+    toast.classList.add('show');
+    clearTimeout(guestToastTimer);
+    guestToastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function lockMenuItem(el) {
+    if (!el) return;
+    el.classList.add('locked-feature');
+    // 直接覆蓋 onclick：不論原本是 switchFeature(...) 還是 toggleSidebarSubmenu(...)，
+    // 賦值會整個取代掉，訪客點擊就只會觸發提示，不會導頁或展開子選單
+    el.onclick = (event) => {
+        event.stopPropagation();
+        showGuestLockedToast();
+    };
+}
+
+function applySidebarGuestState() {
+    ensureGuestLockStyles();
+    LOCKED_MENU_IDS.forEach(id => lockMenuItem(document.getElementById(id)));
+
+    // 訪客（含剛登出）沒有「登出」的必要，側邊欄底部改顯示「登入」，點擊進 index.html 登入
+    const logoutEl = document.getElementById('menu-logout');
+    if (logoutEl) {
+        logoutEl.innerText = '登入';
+        logoutEl.onclick = () => { window.location.href = '../index.html'; };
+    }
+}
+
+// 🔥 用 addEventListener('load', ...) 而不是 window.onload = ...：後者是屬性賦值，
+// 若跟某頁面自己的 window.onload（例如 calender.js／interview.js／consultant.js）
+// 相衝，後載入的會直接蓋掉先前的，導致該頁初始化邏輯整個失效（先前在行事曆頁就出過
+// 這個問題）。addEventListener 是可疊加的監聽器，不會互相覆蓋，多支腳本可以並存。
+// 等到 load 事件才判斷登入狀態，是為了確保 auth.js 的 supabaseClient 已經載入完成
+// （部分頁面 shared-sidebar.js 在 auth.js 之前載入，此時 supabaseClient 還不存在）。
+window.addEventListener('load', async () => {
+    if (typeof supabaseClient === 'undefined') return;
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) applySidebarGuestState();
+    } catch (error) {
+        console.error('側邊欄登入狀態檢查失敗:', error);
+    }
+});
