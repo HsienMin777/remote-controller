@@ -30,8 +30,8 @@ const aiPlayer = document.getElementById('aiPlayer');
 const micBtn = document.getElementById('micBtn');
 
 window.onload = async () => {
-    const user = await checkAuthStatus();
-    if (!user) return;
+    // 🔥 不強制導頁：面試戰場對應的 /api/interview/next 本來就不需要登入，開放訪客直接試用
+    await checkAuthStatusSoft();
 
     const raw = sessionStorage.getItem('interviewArenaState');
     if (!raw) {

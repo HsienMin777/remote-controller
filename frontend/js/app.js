@@ -30,10 +30,11 @@ let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. 檢查登入狀態
-    if (typeof checkAuthStatus === 'function') {
-        currentUser = await checkAuthStatus();
-        if (!currentUser) return;
-        console.log("使用者已登入:", currentUser.email);
+    // 🔥 用不強制導頁的 checkAuthStatusSoft()：模擬面試／JD 診斷這兩項功能允許訪客直接試用
+    //    （對應的後端路由本來就不需要登入），只有「儲存紀錄」這類動作才真的需要帳號
+    if (typeof checkAuthStatusSoft === 'function') {
+        currentUser = await checkAuthStatusSoft();
+        if (currentUser) console.log("使用者已登入:", currentUser.email);
     }
 
     // 2. 帶入「設定」頁面儲存的面試偏好預設值（使用者沒設定過的欄位就維持原本空白/預設值）

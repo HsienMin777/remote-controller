@@ -978,6 +978,13 @@
 
         function applyGuestLockedSidebar() {
             LOCKED_MENU_IDS.forEach(id => lockMenuItem(document.getElementById(id)));
+
+            // 訪客（含剛登出）沒有「登出」的必要，側邊欄底部改顯示「登入」，點擊進 index.html 登入
+            const logoutEl = document.getElementById('menu-logout');
+            if (logoutEl) {
+                logoutEl.innerText = '登入';
+                logoutEl.onclick = () => { window.location.href = '../index.html'; };
+            }
         }
 
         let guestToastTimer = null;

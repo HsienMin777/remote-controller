@@ -50,7 +50,7 @@
             <div id="menu-settings" class="${menuClass('settings')}" onclick="switchFeature('settings')">
                 設定
             </div>
-            <div class="menu-item" onclick="logout()">
+            <div id="menu-logout" class="menu-item" onclick="logout()">
                 登出
             </div>
         </div>

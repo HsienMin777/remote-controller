@@ -107,6 +107,14 @@ window.checkAuthStatus = async function() {
     return session.user;
 }
 
+// 🔥 不強制導頁的版本：模擬面試 (interview.html) 與面試戰場 (interview_arena.html)
+//    這兩項功能對應的後端路由本來就不需要登入即可呼叫，開放訪客也能直接試用；
+//    只有「儲存紀錄」這類明確需要帳號的動作，才會在各自呼叫處另外處理沒有 session 的情況。
+window.checkAuthStatusSoft = async function() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session?.user || null;
+}
+
 // 登出功能
 // 🔥 登出後導向 overview.html（而非登入頁）：該頁現在是訪客也能瀏覽的頁面殼，
 //    未登入時會自動鎖定需要帳號的功能（見 overview.html 的 applyGuestLockedSidebar()）
