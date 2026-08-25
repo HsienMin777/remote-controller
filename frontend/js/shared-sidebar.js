@@ -143,6 +143,14 @@ function applySidebarGuestState() {
 // 等到 load 事件才判斷登入狀態，是為了確保 auth.js 的 supabaseClient 已經載入完成
 // （部分頁面 shared-sidebar.js 在 auth.js 之前載入，此時 supabaseClient 還不存在）。
 window.addEventListener('load', async () => {
+    // 🔥 ?guest=1：從網站裸網址 "/" 進站時後端一律帶這個參數，不管使用者有沒有有效
+    // session 都強制顯示訪客鎖定版側邊欄（比照業界公開首頁 + 登入按鈕的模式）。
+    // 之後在系統內點側邊欄/Logo 導覽回總覽頁的網址不會帶這個參數，才會照實際登入狀態顯示。
+    if (new URLSearchParams(window.location.search).get('guest') === '1') {
+        applySidebarGuestState();
+        return;
+    }
+
     if (typeof supabaseClient === 'undefined') return;
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();

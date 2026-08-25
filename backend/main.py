@@ -729,12 +729,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 # 🔥 進站首頁改為「訪客版總覽頁」而非登入表單：比照業界常見的公開首頁 + 登入按鈕模式，
-#    裸網址 "/" 導向 overview.html（未登入時自動顯示鎖定版 UI，見 shared-sidebar.js），
-#    使用者要按下「登入」才會前往真正的登入表單。用 redirect（而非直接回傳檔案內容）
-#    是為了讓瀏覽器網址列同步更新，避免 auth-guard.js 的頁面判斷把裸網址誤認成登入頁。
+#    裸網址 "/" 導向 overview.html。用 redirect（而非直接回傳檔案內容）是為了讓瀏覽器
+#    網址列同步更新，避免 auth-guard.js 的頁面判斷把裸網址誤認成登入頁。
+#    帶上 ?guest=1：不管使用者是否已有有效 session，第一次進站一律強制顯示訪客鎖定版
+#    （見 overview.html 與 shared-sidebar.js 對這個參數的處理）；使用者從側邊欄/Logo
+#    點回總覽頁時網址不會帶這個參數，那時才照實際登入狀態顯示個人化內容。
 @app.get("/", include_in_schema=False)
 async def serve_root():
-    return RedirectResponse(url="/frontend/pages/overview.html")
+    return RedirectResponse(url="/frontend/pages/overview.html?guest=1")
 
 # 🔥 檔案改組：登入表單本體位於 frontend/index.html。
 #    "/index.html"／"/login.html"（不帶 /frontend/ 前綴）都對應到這個登入頁，
