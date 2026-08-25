@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import PyPDF2
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 # SQLAlchemy 相關套件
 from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, inspect, text
 from sqlalchemy.orm import declarative_base, Session
@@ -728,12 +728,17 @@ async def generate_redemption(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# 🔥 檔案改組：原本的登入頁 (login.html) 搬到 frontend/index.html，變成真正字面意義上
-#    的「入口首頁」；原本的主頁/模擬面試頁 (index.html) 改名搬到 frontend/pages/interview.html，
-#    跟其他功能頁放在一起，不再享有根目錄的特殊地位。
-#    "/" 與裸網址 "/index.html"／"/login.html"（不帶 /frontend/ 前綴）都對應到新的登入頁，
-#    保留這幾個網址是為了相容任何還指向舊路徑的書籤/連結，避免直接 404。
+# 🔥 進站首頁改為「訪客版總覽頁」而非登入表單：比照業界常見的公開首頁 + 登入按鈕模式，
+#    裸網址 "/" 導向 overview.html（未登入時自動顯示鎖定版 UI，見 shared-sidebar.js），
+#    使用者要按下「登入」才會前往真正的登入表單。用 redirect（而非直接回傳檔案內容）
+#    是為了讓瀏覽器網址列同步更新，避免 auth-guard.js 的頁面判斷把裸網址誤認成登入頁。
 @app.get("/", include_in_schema=False)
+async def serve_root():
+    return RedirectResponse(url="/frontend/pages/overview.html")
+
+# 🔥 檔案改組：登入表單本體位於 frontend/index.html。
+#    "/index.html"／"/login.html"（不帶 /frontend/ 前綴）都對應到這個登入頁，
+#    保留這幾個網址是為了相容任何還指向舊路徑的書籤/連結，避免直接 404。
 @app.get("/index.html", include_in_schema=False)
 @app.get("/login.html", include_in_schema=False)
 async def serve_login():
