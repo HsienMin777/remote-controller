@@ -30,13 +30,14 @@ window.isGuestMode = function () {
     try { return sessionStorage.getItem(GUEST_MODE_KEY) === '1'; } catch (error) { return false; }
 };
 
-// 保險機制：不管是帳密表單、Google OAuth，或任何未來新增的登入方式，Supabase 都會透過
-// 這個監聽器統一發出 SIGNED_IN / SIGNED_OUT 事件，比在每個呼叫點各自手動呼叫
-// enterGuestMode()/exitGuestMode() 更不容易漏掉（例如 Google OAuth 目前就沒有專屬的
-// 「登入成功」callback 可以掛）。注意：頁面載入時讀到既有 session 觸發的是
-// INITIAL_SESSION，不是 SIGNED_IN，所以不會誤把「單純還有沒過期的 session」當成剛登入。
+// 保險機制：只處理 SIGNED_OUT，不處理 SIGNED_IN。
+// 🔥 原本想連 SIGNED_IN 也一併處理（涵蓋 Google OAuth 沒有專屬成功 callback 的情況），
+// 但實測發現：只要背景還有沒過期的 session，「每一次」頁面載入（包括單純點側邊欄
+// 導覽到別頁）都會觸發 SIGNED_IN，而不是只有「真的剛登入」才觸發——結果變成每換一頁
+// 就把訪客旗標清掉一次，訪客模式完全無法持續。Google OAuth 登入完成的情況已經由
+// auth-guard.js 在登入頁偵測到 session 時處理，不需要靠這裡的 SIGNED_IN 事件。
+// SIGNED_OUT 則沒有這個問題（不會被「單純還有 session」誤觸發），繼續保留當作保險。
 supabaseClient.auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_IN') exitGuestMode();
     if (event === 'SIGNED_OUT') enterGuestMode();
 });
 

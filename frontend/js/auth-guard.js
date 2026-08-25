@@ -34,6 +34,13 @@
         return `../index.html?redirect=${encodeURIComponent(target)}`;
     }
 
+    // Supabase OAuth（Google 登入）導回本頁時，網址會帶 code=（PKCE flow）或
+    // #access_token=（implicit flow）這類標記——用來跟「單純訪問登入頁、背景剛好還有
+    // 一個沒過期的 session」區分開來，只有真的剛完成 OAuth 才無視訪客模式直接放行。
+    function isOAuthCallback() {
+        return window.location.hash.includes('access_token=') || new URLSearchParams(window.location.search).has('code');
+    }
+
     async function runGuard() {
         // 這支腳本必須排在 auth.js 之後載入才會有 supabaseClient；萬一順序不對，
         // 寧可讓頁面照常顯示（退回舊有的 checkAuthStatus() 機制），也不要整頁卡死在隱藏狀態
@@ -58,11 +65,13 @@
         const effectivelyLoggedIn = !!session && !guestMode;
 
         if (page === 'index.html') {
-            // 登入頁：只要偵測到 session 就代表登入真的成功了（不論是帳密表單、Google
-            // OAuth 導回這頁、或直接帶著有效 session 訪問這頁），一律清掉訪客旗標並放行，
-            // 這裡刻意不看 guestMode——否則 Google OAuth 導回這頁時，
-            // 訪客旗標若還沒被非同步的 onAuthStateChange 清掉，就會卡在登入頁出不去。
-            if (session) {
+            // 登入頁：
+            // - 剛完成 Google OAuth 導回這頁（網址帶 code=/#access_token=）且有 session
+            //   → 不管訪客旗標，一律視為登入成功，放行並清掉旗標。
+            // - 其餘情況（不論是帳密表單登入成功後才會呼叫的 exitGuestMode()、或單純
+            //   訪問這頁）→ 照 effectivelyLoggedIn 判斷：還在訪客模式就先讓他看到登入表單，
+            //   即使背景剛好還留著一個沒過期的 session，也不要自動幫他登入進去。
+            if (session && (isOAuthCallback() || effectivelyLoggedIn)) {
                 if (typeof exitGuestMode === 'function') exitGuestMode();
                 const params = new URLSearchParams(window.location.search);
                 const redirect = params.get('redirect');
