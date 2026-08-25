@@ -137,9 +137,9 @@ function renderRedemptionEmptyState(zone) {
 async function persistRedemptionProgress() {
     if (!RedemptionState.recordId) return; // 還沒存檔的即時報告：完成狀態會在使用者按下「儲存並前往資料庫」時一併存入
     try {
-        await fetch(`${API_BASE}/interview/${RedemptionState.recordId}/opportunities`, {
+        await authFetch(`${API_BASE}/interview/${RedemptionState.recordId}/opportunities`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ opportunities: RedemptionState.opportunities })
         });
     } catch (error) {

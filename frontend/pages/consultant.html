@@ -4,6 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <script src="./../js/theme-init.js"></script>
+    <!-- 🛡️ Auth Guard：Supabase SDK + auth.js + auth-guard.js 必須提早在 <head> 載入，
+         才能在畫面畫出來之前就完成登入狀態判斷 (anti-FOUC)，順序不可調換 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script src="./../js/auth-guard.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 面試諮詢室</title>
     <style>
@@ -669,7 +674,7 @@
             <div class="consultant-container">
                 <div class="consultant-header">
                     <h1>AI 面試諮詢室</h1>
-                    <p>針對面試、履歷與職涯發展的疑難雜症，隨時向專屬 AI 諮詢師提問</p>
+                    <p>針對面試、履歷與職涯發展的疑難雜症，隨時向專屬諮詢師提問</p>
                 </div>
 
                 <div class="ticker-wrapper" id="tickerWrapper">
@@ -699,9 +704,6 @@
         </div>
     </div>
 
-    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./../js/auth.js"></script>
     <script src="./../js/calender.js"></script>
     <script>
         function toggleSidebar() {

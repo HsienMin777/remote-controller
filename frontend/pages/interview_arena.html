@@ -4,6 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <script src="./../js/theme-init.js"></script>
+    <!-- 🛡️ Auth Guard：Supabase SDK + auth.js + auth-guard.js 必須提早在 <head> 載入，
+         才能在畫面畫出來之前就完成登入狀態判斷 (anti-FOUC)，順序不可調換 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script src="./../js/auth-guard.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>模擬面試進行中</title>
     <style>
@@ -745,9 +750,6 @@
     <div id="arenaToast" class="arena-toast"></div>
     <button id="audioUnlockBtn" type="button" onclick="unlockAudioPlayback()">🔊 點擊以啟用 AI 面試官語音</button>
 
-    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./../js/auth.js"></script>
     <script src="./../js/calender.js"></script>
     <script>
         function toggleSidebar() {

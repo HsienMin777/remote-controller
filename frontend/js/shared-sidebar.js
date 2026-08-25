@@ -31,23 +31,23 @@
             <div id="menu-jd" class="${menuClass('jd')}" onclick="switchFeature('jd')">
                 履歷與職缺診斷
             </div>
-            <div id="menu-consultant" class="${menuClass('consultant')}" onclick="switchFeature('consultant')">
+            <div id="menu-consultant" class="${menuClass('consultant')}" data-requires-auth="true" onclick="switchFeature('consultant')">
                 AI 面試諮詢
             </div>
             <div class="menu-item-group${isDashboardGroupActive ? ' open' : ''}">
-                <div id="menu-dashboard" class="menu-item menu-item-parent${isDashboardGroupActive ? ' active' : ''}" onclick="toggleSidebarSubmenu(event, this)">
+                <div id="menu-dashboard" class="menu-item menu-item-parent${isDashboardGroupActive ? ' active' : ''}" data-requires-auth="true" onclick="toggleSidebarSubmenu(event, this)">
                     <span>面試數據儀表板</span>
                     <span class="submenu-arrow">▾</span>
                 </div>
                 <div class="submenu">
-                    <div id="submenu-dashboard" class="${submenuClass('dashboard')}" onclick="switchFeature('dashboard')">面試紀錄</div>
-                    <div id="submenu-resume-records" class="${submenuClass('resume-records')}" onclick="switchFeature('resume-records')">履歷上傳紀錄</div>
+                    <div id="submenu-dashboard" class="${submenuClass('dashboard')}" data-requires-auth="true" onclick="switchFeature('dashboard')">面試紀錄</div>
+                    <div id="submenu-resume-records" class="${submenuClass('resume-records')}" data-requires-auth="true" onclick="switchFeature('resume-records')">履歷上傳紀錄</div>
                 </div>
             </div>
-            <div id="menu-calendar" class="${menuClass('calendar')}" onclick="switchFeature('calendar')">
+            <div id="menu-calendar" class="${menuClass('calendar')}" data-requires-auth="true" onclick="switchFeature('calendar')">
                 行事曆
             </div>
-            <div id="menu-settings" class="${menuClass('settings')}" onclick="switchFeature('settings')">
+            <div id="menu-settings" class="${menuClass('settings')}" data-requires-auth="true" onclick="switchFeature('settings')">
                 設定
             </div>
             <div id="menu-logout" class="menu-item" onclick="logout()">
@@ -71,8 +71,11 @@ function toggleSidebarSubmenu(event, el) {
 // 之前只在 overview.html 處理過，訪客導到 interview.html／interview_arena.html
 // （這兩頁現在開放訪客直接試用）時側邊欄卻沒同步套用鎖定，看起來像「變回登入狀態」。
 // 統一由這支共用腳本處理，才能確保訪客在任何一頁看到的側邊欄狀態永遠一致。
+//
+// 🔥 鎖定範圍改用 data-requires-auth="true" 屬性掃描，不再寫死一份 ID 清單——
+// 任何頁面、任何元素（不只側邊欄）只要標上這個屬性，訪客造訪時就會自動被鎖定，
+// 不用回來改這支共用腳本。目前套用在側邊欄的 6 個項目上（見上方注入的 HTML）。
 // ==========================================
-const LOCKED_MENU_IDS = ['menu-consultant', 'menu-calendar', 'menu-dashboard', 'menu-settings', 'submenu-dashboard', 'submenu-resume-records'];
 
 function ensureGuestLockStyles() {
     if (document.getElementById('guestLockStyles')) return;
@@ -123,7 +126,7 @@ function lockMenuItem(el) {
 
 function applySidebarGuestState() {
     ensureGuestLockStyles();
-    LOCKED_MENU_IDS.forEach(id => lockMenuItem(document.getElementById(id)));
+    document.querySelectorAll('[data-requires-auth="true"]').forEach(lockMenuItem);
 
     // 訪客（含剛登出）沒有「登出」的必要，側邊欄底部改顯示「登入」，點擊進 index.html 登入
     const logoutEl = document.getElementById('menu-logout');

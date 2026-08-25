@@ -15,9 +15,7 @@ window.onload = async () => {
 async function loadResumeRecords() {
     const list = document.getElementById('resumeRecordsList');
     try {
-        const response = await fetch(`${RESUME_API_BASE}/resume/history`, {
-            headers: await getAuthHeaders()
-        });
+        const response = await authFetch(`${RESUME_API_BASE}/resume/history`);
         if (!response.ok) throw new Error('讀取失敗');
 
         const data = await response.json();

@@ -131,11 +131,8 @@ function closeAddScheduleModal() {
 // ---------------------------
 async function loadSchedules() {
     try {
-        const response = await fetch(`${API_BASE_URL}/events`, {
-            method: 'GET',
-            headers: await getAuthHeaders()
-        });
-        
+        const response = await authFetch(`${API_BASE_URL}/events`, { method: 'GET' });
+
         if (!response.ok) throw new Error("API 請求失敗");
         
         allSchedules = await response.json();
@@ -236,9 +233,9 @@ async function submitScheduleForm(event) {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-        const response = await fetch(url, {
+        const response = await authFetch(url, {
             method: method,
-            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
@@ -268,10 +265,7 @@ async function deleteSchedule() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/events/${id}`, {
-            method: 'DELETE',
-            headers: await getAuthHeaders()
-        });
+        const response = await authFetch(`${API_BASE_URL}/events/${id}`, { method: 'DELETE' });
 
         if (response.ok) {
             closeAddScheduleModal();

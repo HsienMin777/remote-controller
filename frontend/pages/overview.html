@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <script src="./../js/theme-init.js"></script>
     <script src="./../js/hero-image-presets.js"></script>
+    <!-- 🛡️ Auth Guard：Supabase SDK + auth.js + auth-guard.js 必須提早在 <head> 載入，
+         才能在畫面畫出來之前就完成登入狀態判斷 (anti-FOUC)，順序不可調換 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./../js/auth.js"></script>
+    <script src="./../js/auth-guard.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>總覽 - OfferDash</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -680,9 +685,6 @@
         </div>
     </div>
 
-    <!-- 載入 Supabase SDK 與共用登入邏輯 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./../js/auth.js"></script>
     <script>
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');
@@ -955,9 +957,7 @@
             if (greetingEl) greetingEl.innerText = `${greetingName} 您好`;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/history`, {
-                    headers: await getAuthHeaders()
-                });
+                const response = await authFetch(`${API_BASE_URL}/history`);
                 if (response.ok) {
                     const data = await response.json();
                     realData = data.records || [];

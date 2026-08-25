@@ -9,7 +9,7 @@ const CONSULTANT_MAX_CHARS = 500;
 const QUICK_QUESTIONS = [
     '一分鐘自我介紹', '如何突顯個人優勢？', '沒經驗怎麼爭取？', '怎麼解釋履歷空窗？',
     '最大缺點怎麼答？', '為什麼想應徵這裡？', '離職原因怎麼說？', '挫折經驗怎麼回答？',
-    '意見不合怎麼處理？', '遇到不會的題怎辦？', '面試太緊張怎麼辦？', '如何展現抗壓性？',
+    '意見不合怎麼處理？', '遇到不會的題怎麼辦？', '面試太緊張怎麼辦？', '如何展現抗壓性？',
     '期望薪資怎麼談？', '最後一題該問什麼？', '面試感謝信怎麼寫？'
 ];
 
@@ -45,9 +45,7 @@ function renderTicker() {
 
 async function refreshQuota() {
     try {
-        const response = await fetch(`${CONSULTANT_API_BASE}/consultant/quota`, {
-            headers: await getAuthHeaders()
-        });
+        const response = await authFetch(`${CONSULTANT_API_BASE}/consultant/quota`);
         if (!response.ok) throw new Error('讀取額度失敗');
         const data = await response.json();
         applyQuota(data.remaining_quota, data.daily_limit);
@@ -120,9 +118,9 @@ async function sendConsultantMessage() {
     appendSystemNote('AI 諮詢師思考中...');
 
     try {
-        const response = await fetch(`${CONSULTANT_API_BASE}/consultant/chat`, {
+        const response = await authFetch(`${CONSULTANT_API_BASE}/consultant/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message })
         });
 

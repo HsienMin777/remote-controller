@@ -621,9 +621,9 @@ async function saveResumeDiagnosis() {
     };
 
     try {
-        const response = await fetch(`${API_BASE}/resume/save`, {
+        const response = await authFetch(`${API_BASE}/resume/save`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         if (!response.ok) {
@@ -796,9 +796,7 @@ let globalInterviewRecords = [];
 // 撈取歷史紀錄 (你原本可能在網頁載入時有呼叫這個)
 async function fetchInterviewHistory() {
     try {
-        const response = await fetch(`${API_BASE}/interview/history`, {
-            headers: await getAuthHeaders()
-        });
+        const response = await authFetch(`${API_BASE}/interview/history`);
         const data = await response.json();
         globalInterviewRecords = data.records || [];
 
@@ -933,9 +931,9 @@ async function saveReportToDB() {
         : null;
 
     try {
-        const response = await fetch(`${API_BASE}/interview/save`, {
+        const response = await authFetch(`${API_BASE}/interview/save`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(currentReportPayload)
         });
         if (!response.ok) {
