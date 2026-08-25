@@ -5,6 +5,41 @@ const supabaseKey = 'sb_publishable_UjNF38cuN4kKP2O6hhAWjg_KLI0zztB';
 // 🔥 關鍵修正：改用 supabaseClient，避免跟官方套件撞名！
 const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
+// ==========================================
+// 🔒 訪客瀏覽模式旗標（將「登出/訪客」與「登入」兩套體驗完全隔開）
+// 問題：Supabase 的 session 只要沒過期就會一直存在瀏覽器裡，若各頁面只單純檢查
+// 「有沒有 session」，使用者從強制訪客版的首頁 (?guest=1) 點進其他頁面時，
+// 背景那個還沒過期的 session 就會讓那些頁面誤判成「已登入」，UI 忽登忽出。
+// 用 sessionStorage 存一個「目前是訪客瀏覽模式」的旗標，讓這個狀態能跨頁面延續，
+// 不再單靠 session 是否存在來決定 UI——只有真正透過登入表單/Google 登入成功，
+// 才會清除這個旗標，兩套體驗才會確實切換。
+// sessionStorage（而非 localStorage）是刻意選擇：只在同一個分頁的瀏覽期間有效，
+// 分頁關掉或開新分頁都會重新從「未設定」開始，不會永久卡住。
+// ==========================================
+const GUEST_MODE_KEY = 'offerdash_guest_mode';
+
+window.enterGuestMode = function () {
+    try { sessionStorage.setItem(GUEST_MODE_KEY, '1'); } catch (error) { /* 私密瀏覽模式等情境可能無法存取，忽略即可 */ }
+};
+
+window.exitGuestMode = function () {
+    try { sessionStorage.removeItem(GUEST_MODE_KEY); } catch (error) { /* 同上 */ }
+};
+
+window.isGuestMode = function () {
+    try { return sessionStorage.getItem(GUEST_MODE_KEY) === '1'; } catch (error) { return false; }
+};
+
+// 保險機制：不管是帳密表單、Google OAuth，或任何未來新增的登入方式，Supabase 都會透過
+// 這個監聽器統一發出 SIGNED_IN / SIGNED_OUT 事件，比在每個呼叫點各自手動呼叫
+// enterGuestMode()/exitGuestMode() 更不容易漏掉（例如 Google OAuth 目前就沒有專屬的
+// 「登入成功」callback 可以掛）。注意：頁面載入時讀到既有 session 觸發的是
+// INITIAL_SESSION，不是 SIGNED_IN，所以不會誤把「單純還有沒過期的 session」當成剛登入。
+supabaseClient.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_IN') exitGuestMode();
+    if (event === 'SIGNED_OUT') enterGuestMode();
+});
+
 let isLoginMode = true;
 
 function toggleAuthMode() {
@@ -72,6 +107,9 @@ async function handleAuth(event) {
 
         if (error) throw error;
 
+        // 真正完成登入：解除訪客瀏覽模式，之後各頁面才會照實際 session 顯示登入後內容
+        exitGuestMode();
+
         // 成功後跳轉到登入後總覽主頁
         // 🔥 用相對路徑：這支函式只會在 frontend/index.html (登入頁，深度 0) 上執行，
         //    才能同時在 Render (/frontend/...) 與 Vercel (直接掛在網域根目錄) 上正確導向
@@ -117,12 +155,15 @@ window.checkAuthStatusSoft = async function() {
 
 // 登出功能
 // 🔥 登出後導向 overview.html（而非登入頁）：該頁現在是訪客也能瀏覽的頁面殼，
-//    未登入時會自動鎖定需要帳號的功能（見 overview.html 的 applyGuestLockedSidebar()）
+//    未登入時會自動鎖定需要帳號的功能（見 shared-sidebar.js 的 applySidebarGuestState()）。
+//    同時進入訪客瀏覽模式，確保之後導覽到其他頁面也持續顯示訪客版，不會被背景可能
+//    還沒失效的 session 誤判成已登入。
 window.logout = async function() {
     try {
         console.log("正在執行登出...");
         // 登出：使用 supabaseClient
         await supabaseClient.auth.signOut();
+        enterGuestMode();
         window.location.href = 'overview.html';
     } catch (err) {
         console.error("登出失敗:", err);

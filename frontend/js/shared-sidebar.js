@@ -143,10 +143,16 @@ function applySidebarGuestState() {
 // 等到 load 事件才判斷登入狀態，是為了確保 auth.js 的 supabaseClient 已經載入完成
 // （部分頁面 shared-sidebar.js 在 auth.js 之前載入，此時 supabaseClient 還不存在）。
 window.addEventListener('load', async () => {
-    // 🔥 ?guest=1：從網站裸網址 "/" 進站時後端一律帶這個參數，不管使用者有沒有有效
-    // session 都強制顯示訪客鎖定版側邊欄（比照業界公開首頁 + 登入按鈕的模式）。
-    // 之後在系統內點側邊欄/Logo 導覽回總覽頁的網址不會帶這個參數，才會照實際登入狀態顯示。
-    if (new URLSearchParams(window.location.search).get('guest') === '1') {
+    // 🔥 ?guest=1：從網站裸網址 "/" 進站時後端會帶這個參數，順便把訪客瀏覽模式旗標
+    // 存進 sessionStorage（見 auth.js 的 enterGuestMode()），讓這個狀態能跨頁面延續。
+    if (new URLSearchParams(window.location.search).get('guest') === '1' && typeof enterGuestMode === 'function') {
+        enterGuestMode();
+    }
+
+    // 🔥 訪客瀏覽模式旗標優先於「有沒有 session」：只要還在訪客瀏覽模式（不論是剛登出，
+    // 還是從強制訪客版首頁進站後導覽到其他頁面），即使背景還留著一個沒過期的 session，
+    // 側邊欄也要持續顯示鎖定版，不會忽登忽出。只有真正登入成功才會清除這個旗標。
+    if (typeof isGuestMode === 'function' && isGuestMode()) {
         applySidebarGuestState();
         return;
     }

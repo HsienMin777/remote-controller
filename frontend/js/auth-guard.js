@@ -51,10 +51,19 @@
         }
 
         const page = currentPageName();
+        // 🔥 訪客瀏覽模式旗標（見 auth.js）優先於「有沒有 session」：只要使用者是從
+        // 強制訪客版首頁進站或剛登出，即使背景還留著一個沒過期的 session，也要當作
+        // 未登入處理，直到使用者真正透過登入表單/Google 登入成功為止。
+        const guestMode = typeof isGuestMode === 'function' && isGuestMode();
+        const effectivelyLoggedIn = !!session && !guestMode;
 
         if (page === 'index.html') {
-            // 登入頁：已經登入就不該再看到登入表單，直接導去原本要去的頁面或總覽頁
+            // 登入頁：只要偵測到 session 就代表登入真的成功了（不論是帳密表單、Google
+            // OAuth 導回這頁、或直接帶著有效 session 訪問這頁），一律清掉訪客旗標並放行，
+            // 這裡刻意不看 guestMode——否則 Google OAuth 導回這頁時，
+            // 訪客旗標若還沒被非同步的 onAuthStateChange 清掉，就會卡在登入頁出不去。
             if (session) {
+                if (typeof exitGuestMode === 'function') exitGuestMode();
                 const params = new URLSearchParams(window.location.search);
                 const redirect = params.get('redirect');
                 window.location.replace(redirect ? `pages/${redirect}` : 'pages/overview.html');
@@ -64,7 +73,7 @@
             return;
         }
 
-        if (PROTECTED_PAGES.includes(page) && !session) {
+        if (PROTECTED_PAGES.includes(page) && !effectivelyLoggedIn) {
             window.location.replace(buildLoginRedirectUrl());
             return;
         }

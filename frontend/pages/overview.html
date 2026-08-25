@@ -932,10 +932,14 @@
             // 🔥 這裡改用不會強制導頁的 getSession()：overview.html 現在是訪客也能瀏覽的頁面殼，
             // 未登入時只顯示訪客版內容，不再像其他頁面一樣被 checkAuthStatus() 導回登入頁
             //
-            // 🔥 ?guest=1：從網站裸網址 "/" 進站一律強制訪客版，不管有沒有有效 session
-            // （見 backend/main.py 的根路由與 shared-sidebar.js）；系統內導覽回本頁時
-            // 網址不會帶這個參數，才照實際登入狀態顯示個人化內容
-            const forceGuestView = new URLSearchParams(window.location.search).get('guest') === '1';
+            // 🔥 ?guest=1：從網站裸網址 "/" 進站時後端會帶這個參數，這裡順便把訪客瀏覽模式
+            // 旗標存進 sessionStorage（見 auth.js 的 enterGuestMode()），這樣使用者從本頁
+            // 點進其他頁面（interview.html／interview_arena.html 等）時，即使背景還留著一個
+            // 沒過期的 session，也會持續顯示訪客版，不會忽登忽出。
+            if (new URLSearchParams(window.location.search).get('guest') === '1') {
+                enterGuestMode();
+            }
+            const forceGuestView = isGuestMode();
             const { data: { session } } = forceGuestView ? { data: { session: null } } : await supabaseClient.auth.getSession();
             const user = session?.user || null;
 
