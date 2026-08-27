@@ -1,6 +1,8 @@
 # API連接
 from flask import Flask, render_template_string, request
 import os
+
+
 import socket
 
 #LINE Bot
@@ -9,14 +11,24 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
 # 爬蟲
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import json
 import requests
-from bs4 import BeautifulSoup 
-line_bot_api = LineBotApi('CkPHM4CpqDvRm12cUKqziUMyIvhoudv/Oc8Kv9eSydOEamdv6cqvud2qq7UpwXvNcY0TC1Ub7CGOhrjAp7cnvB+MHZr+cxz0Ht5LmKjVrS4sxjtyIHm67oqJS9q3bMqppd/iTIq6oC0RYVIKAK2IQAdB04t89/1O/w1cDnyilFU=')
-user_id = 'U2317f7d6f7b91663b4c3ff4ee6ee81c9'
+from bs4 import BeautifulSoup
+
+from dotenv import load_dotenv
+load_dotenv()
+
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_USER_ID = os.environ.get("LINE_USER_ID")
+
+if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_USER_ID:
+    raise RuntimeError(
+        "請設定環境變數 LINE_CHANNEL_ACCESS_TOKEN 與 LINE_USER_ID"
+        "（可在 app/ 底下建立 .env 檔案，參考 .env.example）"
+    )
+
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+user_id = LINE_USER_ID
 
 # 關機
 import pygetwindow as gw
@@ -26,6 +38,14 @@ import time
 # 滑鼠
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO
+
+# ChatGPT
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -52,16 +72,18 @@ HTML_PAGE = """
         .open_google { background-color: #3498db; }
         .get_news { background-color: #54ACFF; }
         .mouse {background-color: orange;}
+        .chatgpt {background-color: #1da484;}
 
-        .result { margin-top: 20px; font-size: 20px; color: green; }
+        .result { margin-top: 20px; font-size: 20px; color: white; }
     </style>
 </head>
 <body>
-    <h1>Python 遠端控制介面</h1>
-    <button class="shutdown" onclick="sendCommand('shutdown')">關機</button>
-    <button class="open_google" onclick="sendCommand('open_google')">開啟 Google</button>
-    <button class="get_news" onclick="sendCommand('send_news')">新聞</button>
-    <button class="mouse" onclick="window.location.href='/mouse_control'">滑鼠</button>
+    <h1 style = "color: white">Python 遠端控制介面</h1>
+    <button class="shutdown" onclick="sendCommand('shutdown')">Turn off</button>
+    <button class="open_google" onclick="sendCommand('open_google')">Open Google</button>
+    <button class="get_news" onclick="sendCommand('send_news')">NEWS</button>
+    <button class="mouse" onclick="window.location.href='/mouse_control'">Mouse</button>
+    <button class="chatgpt" onclick="sendCommand('ask_gpt')">Ask ChatGPT</button>
 
 
 
@@ -86,7 +108,6 @@ HTML_PAGE = """
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # 丟到外部但不會真的發送，只是為了取得實際網卡 IP
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
     except:
@@ -100,7 +121,7 @@ def close_all_windows():
      all_windows = gw.getAllWindows()
      return_close_win = []
      for w in all_windows:
-        try:   
+        try:
             title = w.title.strip()
             return_close_win.append(title)
             if title:
@@ -119,7 +140,7 @@ def close_all_windows():
             w.activate()                 # 聚焦視窗
             time.sleep(2)
             pyautogui.hotkey('alt', 'f4')  # Alt+F4
-            time.sleep(0.5)  
+            time.sleep(0.5)
             pyautogui.press('enter')
         except Exception as e:
             print(f"無法關閉視窗: {title}, 錯誤: {e}")
@@ -133,6 +154,7 @@ def scratch_news():
 
     t=''
     l=''
+
     r=''
     i=0
     j = 0
@@ -149,7 +171,15 @@ def scratch_news():
             t = str(i) + " " + title
             l = "連結：" + full_url
             r += t + '\n' + l + '\n\n'
-    line_bot_api.push_message('U2317f7d6f7b91663b4c3ff4ee6ee81c9', TextSendMessage(text=r))
+    line_bot_api.push_message(user_id, TextSendMessage(text=r))
+
+def ask_gpt():
+    pyautogui.hotkey('ctrl', 'c')
+
+    os.system("start https://chat.openai.com/")
+    time.sleep(5)
+    pyautogui.hotkey('ctrl', 'v')
+    pyautogui.hotkey('enter')
 
 
 @app.route("/")
@@ -228,7 +258,7 @@ def mouse_move():
 
     # 取得目前滑鼠位置
     x, y = pyautogui.position()
-    
+
     # 計算新的位置
     new_x = x + dx * 7  # 可依需要調整倍率
     new_y = y + dy * 7
@@ -257,19 +287,23 @@ def run_command():
     cmd = request.args.get("cmd", "")
     if cmd == "shutdown":
         close_all_windows()
-        return render_template_string + "\nWindows 即將關機..."
-           
+        return "Windows 即將關機..."
+
     elif cmd == "send_news":
         scratch_news()
         return "請至聊天室閱覽新聞。"
-    
+
     elif cmd == "open_google":
         os.system("start https://www.google.com")
         return "已開啟 Google 網頁。"
-    
+
     elif cmd == "open_mouse":
         return "已開啟 滑鼠。"
-    
+
+    elif cmd == "ask_gpt":
+        ask_gpt()
+        return "已詢問ChatGPT。"
+
     else:
         return f"未知指令：{cmd}"
 
@@ -277,9 +311,6 @@ if __name__ == "__main__":
     p = "http://" + server_ip + ":5000/"
     print(f"位址 : {server_ip}:5000")
 
-    line_bot_api.push_message('U2317f7d6f7b91663b4c3ff4ee6ee81c9', TextSendMessage(p))
+    line_bot_api.push_message(user_id, TextSendMessage(p))
 
     app.run(host="0.0.0.0", port=5000)
-    
-
-
