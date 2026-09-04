@@ -259,15 +259,17 @@
 
         /* 背景圖片層：從 .hero-section 獨立出來，專門負責視差滾動位移。
            scale(1.2) 預先放大，讓位移時四周留有緩衝，捲動時邊緣不會露出裁切容器外的空白。
-           實際圖片來源（預設科技感 SVG 或使用者自訂上傳照片）由 applyHeroImage() 動態寫入。 */
+           已登入且存過「設定」頁自訂選擇的使用者，會由 applyHeroImage() 動態覆寫成
+           他選的圖片；其餘情況（訪客、或登入者從未特別選過）直接吃這裡的預設值。 */
         .hero-bg-image {
             position: absolute;
             inset: 0;
             z-index: 0;
-            /* 佔位背景：先用深色科技感漸層代替真實照片，applyHeroImage() 會在載入時
-               覆寫成使用者在「設定」頁選擇的實際圖片 */
+            /* 🌟 預設背景：全站預設圖（frontend/assets/images/），與
+               hero-image-presets.js 的 'featured-photo' preset 同一張圖，保證兩邊一致。
+               後面兩層漸層當作圖片載入完成前／萬一載入失敗時的深色墊底，不會露出破圖底色。 */
             background-image:
-                radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.25) 0%, transparent 45%),
+                url('../assets/images/pexels-edmond-dantes-4342127.jpg'),
                 radial-gradient(circle at 85% 75%, rgba(30, 58, 138, 0.35) 0%, transparent 50%),
                 linear-gradient(135deg, #050505 0%, #0A0A0A 55%, #141414 100%);
             background-size: cover;

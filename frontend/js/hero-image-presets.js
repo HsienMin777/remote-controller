@@ -3,9 +3,14 @@
 // settings.html 的縮圖選單／overview.html 的實際套用共用同一份定義，
 // 避免兩邊各自維護一份、視覺跑掉。
 //
-// 因為政策不允許引用/瞎猜外部圖片網址，這裡改用 SVG 產生「看起來像真實圖片」的
+// 因為政策不允許引用/瞎猜外部圖片網址，大部分選項改用 SVG 產生「看起來像真實圖片」的
 // 科技感視覺（電路板走線、粒子星圖連線、數據光束…），透過 data URI 當作真正的
 // background-image 圖片使用——不是單純的 CSS 漸層，是可以拿去當 <img> src 用的真圖檔。
+//
+// 🔥 'featured-photo' 是唯一例外：使用者自己提供、已放進 frontend/assets/images/ 的
+// 實景照片（不是猜的外部網址），走的是 cssUrl 欄位直接指向本機靜態檔案路徑，
+// 不需要（也不該）再用 svgToDataUri 包裝。這個 preset 目前是全站預設值——
+// 沒有任何登入/自訂設定時，overview.html 的 Hero 背景就是它。
 // ==========================================
 
 // 🔥 用單引號包 url(...)：settings.js 的 renderHeroImageOptionsGrid() 會把這個回傳值
@@ -22,6 +27,15 @@ function randomBetween(min, max) {
 }
 
 const HERO_IMAGE_PRESET_DEFS = [
+    {
+        // 🌟 全站預設 Hero 背景：實景照片，放在最前面讓它在「設定」頁的縮圖選單中最顯眼。
+        // 圖片實體檔案位於 frontend/assets/images/，用相對路徑（../assets/images/...）
+        // 引用——settings.html 與 overview.html 都在 frontend/pages/ 底下（深度一致），
+        // 同一組相對路徑在 Render (/frontend/pages/...) 與 Vercel (/pages/...) 都能正確解析。
+        key: 'featured-photo',
+        label: '精選實景',
+        cssUrl: '../assets/images/pexels-edmond-dantes-4342127.jpg'
+    },
     {
         key: 'starry',
         label: '深邃星空',
@@ -195,14 +209,18 @@ function getPresetBackgroundCss(key) {
     if (_presetCssCache[key]) return _presetCssCache[key];
     const preset = HERO_IMAGE_PRESET_DEFS.find(p => p.key === key);
     if (!preset) return null;
-    const css = svgToDataUri(preset.svg());
+    // cssUrl：指向 frontend/assets/images/ 底下的真實靜態圖檔，直接包成 url(...)；
+    // 其餘 preset 沒有 cssUrl，走原本的「產生 SVG 再轉 data URI」路徑
+    const css = preset.cssUrl ? `url('${preset.cssUrl}')` : svgToDataUri(preset.svg());
     _presetCssCache[key] = css;
     return css;
 }
 
 // heroImage: { type: 'preset' | 'custom', value: string }
+// 🌟 沒有 heroImage（訪客、或登入者尚未存過任何設定）一律回退到 'featured-photo'，
+// 這是目前全站的預設 Hero 背景
 function getHeroImageBackgroundCss(heroImage) {
-    if (!heroImage || !heroImage.value) return getPresetBackgroundCss('starry');
+    if (!heroImage || !heroImage.value) return getPresetBackgroundCss('featured-photo');
     if (heroImage.type === 'custom') return `url('${heroImage.value}')`;
-    return getPresetBackgroundCss(heroImage.value) || getPresetBackgroundCss('starry');
+    return getPresetBackgroundCss(heroImage.value) || getPresetBackgroundCss('featured-photo');
 }

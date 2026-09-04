@@ -22,7 +22,7 @@ let currentSettings = {
     defaultRounds: 5,
     defaultLocale: 'zh',
     theme: 'light',
-    heroImage: { type: 'preset', value: 'starry' } // type: 'preset' | 'custom'（custom 的 value 是圖片的 base64 data URL）
+    heroImage: { type: 'preset', value: 'featured-photo' } // type: 'preset' | 'custom'（custom 的 value 是圖片的 base64 data URL）
 };
 
 // Tab 3 目前選取中的 Hero 圖片（尚未存檔前的暫存狀態，供預覽用）
@@ -94,7 +94,7 @@ function renderSettingsForm() {
     if (savedHeroImage && savedHeroImage.type && savedHeroImage.value) {
         selectHeroImage(savedHeroImage.type, savedHeroImage.value, { persist: false });
     } else {
-        selectHeroImage('preset', 'starry', { persist: false });
+        selectHeroImage('preset', 'featured-photo', { persist: false });
     }
 }
 
