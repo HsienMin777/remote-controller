@@ -244,12 +244,12 @@
         .hero-section {
             position: relative;
             width: 100%;
-            /* 原本 450px；.main-content 現在有 padding-top: 96px 讓內容避開固定 header，
-               但 Hero 背景圖片應該要滿版延伸到最頂端（蓋在毛玻璃 header 底下透出來），
-               所以用 margin-top: -96px 把 Hero 拉回貼齊最上緣，同時把高度加回這 96px，
-               避免底下的走馬燈區塊跟著被拉上去。另外再往下多延伸 200px。
-               450 + 96 (補償上拉) + 200 (往下延伸) = 746px */
-            height: 746px;
+            /* 原本 746px（450 基礎 + 96 補償 margin-top:-96px + 200 往下延伸），
+               依需求整體再減少 1/4：746 * 0.75 = 559.5，取整數 560px。
+               .main-content 有 padding-top: 96px 讓內容避開固定 header，Hero 背景圖片
+               要滿版延伸到最頂端（蓋在毛玻璃 header 底下透出來），所以用
+               margin-top: -96px 把 Hero 拉回貼齊最上緣——這個補償值本身不隨高度縮放。 */
+            height: 560px;
             margin-top: -96px;
             flex-shrink: 0;
             /* 視差滾動時背景圖片層會位移超出自己的範圍，這裡負責把多出來的部分裁掉，
@@ -269,7 +269,7 @@
                hero-image-presets.js 的 'featured-photo' preset 同一張圖，保證兩邊一致。
                後面兩層漸層當作圖片載入完成前／萬一載入失敗時的深色墊底，不會露出破圖底色。 */
             background-image:
-                url('../assets/images/pexels-edmond-dantes-4342127.jpg'),
+                url('../assets/images/overview.jpg'),
                 radial-gradient(circle at 85% 75%, rgba(30, 58, 138, 0.35) 0%, transparent 50%),
                 linear-gradient(135deg, #050505 0%, #0A0A0A 55%, #141414 100%);
             background-size: cover;
@@ -385,7 +385,7 @@
         @media (max-width: 900px) {
             .hero-grid { grid-template-columns: 1fr; gap: 24px; padding: 32px 24px; }
             .hero-right { height: 220px; }
-            .hero-section { height: auto; min-height: 856px; } /* 560 + 96(補償 margin-top:-96px) + 200(往下延伸) */
+            .hero-section { height: auto; min-height: 642px; } /* 原 856px 同步減少 1/4：856 * 0.75 = 642 */
         }
 
         @media (max-width: 640px) {
@@ -763,13 +763,11 @@
             if (!scrollContainer || !heroBgImage) return;
 
             const PARALLAX_FACTOR = 0.4; // 背景移動速度只有前景捲動速度的 40%
-            // 🔥 Hero 高度後來從 450px 加高到 746px（置頂＋往下延伸 200px 那次改動），
-            // 但這個上限當初是照舊的 450px 抓的，導致捲動一下下（~100px）位移就頂到上限、
-            // 整個效果瞬間「定格」不再變化——尤其滑鼠滾輪一次常常就是 100px 以上，
-            // 視覺上幾乎等於完全沒有漸進位移的過程，感覺就像沒有作用。
-            // 現在 CSS 的 scale(1.3) 對 746px 高的容器可以提供約 112px 的緩衝空間，
-            // 上限跟著放大到 100px，捲動到 250px 左右才會頂到上限，效果會持續明顯更久。
-            const MAX_OFFSET_PX = 100; // 對應 CSS scale(1.3) 預留的緩衝範圍，避免位移過頭露出裁切邊界外的空白
+            // 🔥 Hero 高度後來調整過幾次：CSS scale(1.3) 對高度 H 的容器只能提供
+            // 約 0.15 * H 的上下緩衝空間，MAX_OFFSET_PX 必須小於這個緩衝，
+            // 否則位移到上限時會露出裁切邊界外的空白。目前高度 560px → 緩衝約 84px，
+            // 這裡取 70px 留一點安全緩衝，避免四捨五入／次像素誤差把邊界頂穿。
+            const MAX_OFFSET_PX = 70; // 對應 CSS scale(1.3) 預留的緩衝範圍，避免位移過頭露出裁切邊界外的空白
             let ticking = false;
 
             function updateParallax() {

@@ -34,7 +34,7 @@ const HERO_IMAGE_PRESET_DEFS = [
         // 同一組相對路徑在 Render (/frontend/pages/...) 與 Vercel (/pages/...) 都能正確解析。
         key: 'featured-photo',
         label: '精選實景',
-        cssUrl: '../assets/images/pexels-edmond-dantes-4342127.jpg'
+        cssUrl: '../assets/images/overview.jpg'
     },
     {
         key: 'starry',
