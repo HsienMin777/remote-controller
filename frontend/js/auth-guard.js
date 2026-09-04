@@ -5,8 +5,10 @@
 // 就做完登入狀態判斷，避免「受保護頁面」內容閃一下才被導走 (anti-FOUC)。
 //
 // 這支腳本是既有機制的集中版，不是取代：checkAuthStatus()/checkAuthStatusSoft()
-// (auth.js) 與 shared-sidebar.js 的鎖定機制都維持原樣繼續運作，這裡只是把「頁面級」
-// 的導頁決策提早、集中處理，並新增登入頁反向導頁、redirect 參數、401 自動登出。
+// (auth.js) 維持原樣繼續運作。這裡集中處理「頁面級」的導頁決策、redirect 參數、
+// 401 自動登出，以及原本散落在 shared-sidebar.js 的訪客功能鎖定機制
+// （data-requires-auth="true" 掃描，見下方 window.applyGuestLockUI()），
+// 讓公開頁與應用程式內頁都能共用同一套規則。
 // ==========================================
 (function () {
     // 立即隱藏 body，直到這裡判斷完「要不要導頁」才顯示，避免受保護頁面內容閃現
@@ -27,7 +29,9 @@
     }
 
     // 需要登入才能進入的頁面（未登入會被導回登入頁）；其餘頁面一律視為訪客可瀏覽
-    const PROTECTED_PAGES = ['dashboard.html', 'settings.html', 'calendar.html', 'resume_records.html', 'consultant.html'];
+    // 🔥 interview_arena.html：原本刻意開放訪客免登入試用，現在改為業界標準 SaaS
+    // 路由守衛規則的一部分，一併納入保護清單
+    const PROTECTED_PAGES = ['dashboard.html', 'settings.html', 'calendar.html', 'resume_records.html', 'consultant.html', 'interview_arena.html'];
 
     function buildLoginRedirectUrl() {
         const target = `${currentPageName()}${window.location.search}`;
@@ -42,11 +46,20 @@
     }
 
     async function runGuard() {
+        // 🔥 ?guest=1：後端／vercel.json 把裸網址 "/" 轉址到 overview.html?guest=1，
+        // 目的是「不管背景有沒有還沒過期的 session，第一次進站一律強制顯示訪客版」。
+        // 必須在這裡、算 guestMode/effectivelyLoggedIn 之前就同步設定旗標——如果晚到
+        // shared-sidebar.js／overview.html 自己的 load 事件才設定，會晚於下面
+        // window.authGuardReady 已經算好並快取的結果，導致這次「強制訪客」的狀態沒生效。
+        if (new URLSearchParams(window.location.search).get('guest') === '1' && typeof enterGuestMode === 'function') {
+            enterGuestMode();
+        }
+
         // 這支腳本必須排在 auth.js 之後載入才會有 supabaseClient；萬一順序不對，
         // 寧可讓頁面照常顯示（退回舊有的 checkAuthStatus() 機制），也不要整頁卡死在隱藏狀態
         if (typeof supabaseClient === 'undefined') {
             revealBody();
-            return;
+            return { session: null, effectivelyLoggedIn: false };
         }
 
         let session = null;
@@ -63,34 +76,109 @@
         // 未登入處理，直到使用者真正透過登入表單/Google 登入成功為止。
         const guestMode = typeof isGuestMode === 'function' && isGuestMode();
         const effectivelyLoggedIn = !!session && !guestMode;
+        const state = { session, effectivelyLoggedIn };
 
         if (page === 'index.html') {
-            // 登入頁：
-            // - 剛完成 Google OAuth 導回這頁（網址帶 code=/#access_token=）且有 session
-            //   → 不管訪客旗標，一律視為登入成功，放行並清掉旗標。
-            // - 其餘情況（不論是帳密表單登入成功後才會呼叫的 exitGuestMode()、或單純
-            //   訪問這頁）→ 照 effectivelyLoggedIn 判斷：還在訪客模式就先讓他看到登入表單，
-            //   即使背景剛好還留著一個沒過期的 session，也不要自動幫他登入進去。
-            if (session && (isOAuthCallback() || effectivelyLoggedIn)) {
+            // 🌟 首頁獨立展示原則：index.html 本身現在也是「首頁」的一部分，不管有沒有
+            // 登入，單純造訪它都「不」強制跳轉——UI 動態切換（登入表單 vs 進入控制台）
+            // 交給 index.html 自己的 <script> 監聽 window.authGuardReady 處理。
+            //
+            // 唯一例外：剛完成 Google OAuth 導回這頁（網址帶 code=/#access_token=），
+            // 這是使用者「剛剛主動觸發」的登入動作要完成，不是單純造訪，所以繼續自動
+            // 導去目的地（redirect 參數或 overview.html），不算違反「不強制跳轉」原則。
+            if (session && isOAuthCallback()) {
                 if (typeof exitGuestMode === 'function') exitGuestMode();
                 const params = new URLSearchParams(window.location.search);
                 const redirect = params.get('redirect');
                 window.location.replace(redirect ? `pages/${redirect}` : 'pages/overview.html');
-                return;
+                return state;
             }
             revealBody();
-            return;
+            return state;
         }
 
         if (PROTECTED_PAGES.includes(page) && !effectivelyLoggedIn) {
             window.location.replace(buildLoginRedirectUrl());
-            return;
+            return state;
         }
 
         revealBody();
+        return state;
     }
 
-    runGuard();
+    // 🌟 window.authGuardReady：共用的登入狀態 Promise，讓各頁面自己的 <script>
+    // （例如 index.html 的導覽列動態切換、shared-sidebar.js 的訪客鎖定）不必重新呼叫
+    // supabaseClient.auth.getSession()，直接 await 這裡算好的結果即可，狀態判斷邏輯
+    // （訪客模式旗標優先於 session 等）只集中寫在這一處。
+    window.authGuardReady = runGuard();
+
+    // ==========================================
+    // 🔒 訪客功能鎖定 (Graceful Degradation)：任何頁面、任何元素只要標上
+    // data-requires-auth="true"，訪客造訪時就會自動變灰＋不可點擊，點擊時跳出提示。
+    // 集中放在這裡（而不是個別頁面或 shared-sidebar.js 各自實作），
+    // 才能讓公開行銷頁（如首頁）跟應用程式內頁共用同一套規則與樣式。
+    // ==========================================
+    function ensureGuestLockStyles() {
+        if (document.getElementById('guestLockStyles')) return;
+        const style = document.createElement('style');
+        style.id = 'guestLockStyles';
+        style.textContent = `
+            .locked-feature { opacity: 0.5; cursor: not-allowed !important; pointer-events: auto; }
+            .locked-feature:hover { background: transparent; color: var(--text-muted); }
+            .locked-feature .submenu-arrow { display: none; }
+            #guestLockedToast {
+                position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
+                background: #141414; color: #FAFAFA; padding: 12px 20px; border-radius: var(--radius-md, 12px);
+                font-size: 14px; font-weight: 600; box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.4);
+                opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 1000; white-space: nowrap; max-width: 90vw; text-align: center;
+            }
+            #guestLockedToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        `;
+        document.head.appendChild(style);
+
+        if (!document.getElementById('guestLockedToast')) {
+            const toast = document.createElement('div');
+            toast.id = 'guestLockedToast';
+            document.body.appendChild(toast);
+        }
+    }
+
+    let guestToastTimer = null;
+    function showGuestLockedToast() {
+        ensureGuestLockStyles();
+        const toast = document.getElementById('guestLockedToast');
+        if (!toast) return;
+        toast.innerText = '🔒 此為專屬客製化功能，請登入後解鎖使用';
+        toast.classList.add('show');
+        clearTimeout(guestToastTimer);
+        guestToastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function lockGuestElement(el) {
+        if (!el || el.classList.contains('locked-feature')) return;
+        el.classList.add('locked-feature');
+        // 直接覆蓋 onclick：不論原本綁的是導頁、切換選單還是其他動作，賦值會整個取代掉，
+        // 訪客點擊就只會觸發提示，不會執行原本的動作
+        el.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            showGuestLockedToast();
+        };
+    }
+
+    window.applyGuestLockUI = function () {
+        ensureGuestLockStyles();
+        document.querySelectorAll('[data-requires-auth="true"]').forEach(lockGuestElement);
+    };
+
+    window.authGuardReady.then((state) => {
+        // 等 DOM（含各頁面自己動態注入的 sidebar／內容）就緒後再掃描鎖定，
+        // 跟 shared-sidebar.js 原本的時機一致，避免元素還沒插入就掃描落空
+        window.addEventListener('load', () => {
+            if (!state.effectivelyLoggedIn) window.applyGuestLockUI();
+        });
+    });
 
     // ==========================================
     // 🔥 401 自動登出：共用的 fetch 封裝，取代各頁面手動組 headers + 各自處理錯誤。

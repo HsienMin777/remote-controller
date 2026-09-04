@@ -25,7 +25,7 @@ async function initCalendarSystem() {
 }
 
 // 🔥 登出後導向 overview.html（而非登入頁）：該頁現在是訪客也能瀏覽的頁面殼，
-//    未登入時會自動鎖定需要帳號的功能（見 shared-sidebar.js 的 applySidebarGuestState()）。
+//    未登入時會自動鎖定需要帳號的功能（見 auth-guard.js 的 window.applyGuestLockUI()）。
 //    同時進入訪客瀏覽模式，確保之後導覽到其他頁面也持續顯示訪客版。
 async function logout() {
     await supabaseClient.auth.signOut();

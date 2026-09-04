@@ -7,7 +7,8 @@ AI 驅動的求職教練平台：從履歷 / 職缺 (JD) 契合度診斷、AI �
 ### 1. AI 模擬面試 (AI Simulated Interview)
 - 使用者設定應徵職位、難度、題數、面試語言（中/英）、面試類型（職場 / 升學）
 - 可上傳 PDF 履歷，AI（GPT-4o）會依履歷內容與職缺描述客製化提問與追問
-- 支援語音輸入（Web Speech API 麥克風按鈕），Enter 送出、Shift+Enter 換行
+- 支援語音輸入（Web Speech API 麥克風按鈕即時轉文字），Enter 送出、Shift+Enter 換行
+- AI 面試官每輪回覆皆由 OpenAI TTS（`tts-1`，onyx 音色）合成語音並自動播放，營造真人面試官對話感；語音辨識另有 Whisper（`whisper-1`）作為備援轉錄路徑
 - 獨立「面試戰場」頁面 (`interview_arena.html`) 呈現沉浸式對話介面，並在對話結束後自動生成復盤報告
 
 ### 2. 履歷與 JD 契合度診斷 (Resume × JD Match Diagnosis)
@@ -49,7 +50,7 @@ AI 驅動的求職教練平台：從履歷 / 職缺 (JD) 契合度診斷、AI �
 
 ## 技術架構
 
-**後端**：FastAPI (Python) · SQLAlchemy ORM · PostgreSQL (Supabase) · APScheduler（背景排程/寄信）· OpenAI API (GPT-4o / GPT-4o-mini) · PyPDF2（履歷文字擷取）· smtplib（Gmail SMTP 寄信）
+**後端**：FastAPI (Python) · SQLAlchemy ORM · PostgreSQL (Supabase) · APScheduler（背景排程/寄信）· OpenAI API（對話：GPT-4o / GPT-4o-mini；語音：Whisper `whisper-1` 語音轉文字、TTS `tts-1` 文字轉語音）· PyPDF2（履歷文字擷取）· smtplib（Gmail SMTP 寄信）
 
 **前端**：純 HTML / CSS / JavaScript（無建置工具、無框架）· Supabase JS SDK（登入狀態管理）· Web Speech API（語音輸入）· CSS 自訂屬性 (Design Token) 驅動的主題系統
 

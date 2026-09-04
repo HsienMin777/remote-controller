@@ -111,10 +111,12 @@ async function handleAuth(event) {
         // 真正完成登入：解除訪客瀏覽模式，之後各頁面才會照實際 session 顯示登入後內容
         exitGuestMode();
 
-        // 成功後跳轉到登入後總覽主頁
+        // 成功後跳轉：優先導回使用者原本想去的受保護頁面 (?redirect=xxx.html，
+        // 由 auth-guard.js 的 buildLoginRedirectUrl() 帶過來)，沒有就回登入後總覽主頁
         // 🔥 用相對路徑：這支函式只會在 frontend/index.html (登入頁，深度 0) 上執行，
         //    才能同時在 Render (/frontend/...) 與 Vercel (直接掛在網域根目錄) 上正確導向
-        window.location.href = './pages/overview.html';
+        const redirectTarget = new URLSearchParams(window.location.search).get('redirect');
+        window.location.href = redirectTarget ? `./pages/${redirectTarget}` : './pages/overview.html';
 
     } catch (err) {
         console.error('Auth Error:', err);
@@ -156,7 +158,7 @@ window.checkAuthStatusSoft = async function() {
 
 // 登出功能
 // 🔥 登出後導向 overview.html（而非登入頁）：該頁現在是訪客也能瀏覽的頁面殼，
-//    未登入時會自動鎖定需要帳號的功能（見 shared-sidebar.js 的 applySidebarGuestState()）。
+//    未登入時會自動鎖定需要帳號的功能（見 auth-guard.js 的 window.applyGuestLockUI()）。
 //    同時進入訪客瀏覽模式，確保之後導覽到其他頁面也持續顯示訪客版，不會被背景可能
 //    還沒失效的 session 誤判成已登入。
 window.logout = async function() {

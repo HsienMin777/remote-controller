@@ -922,9 +922,9 @@
 
         // 問候語：優先使用「設定」頁面存的顯示名稱，沒設定過就退回顯示登入信箱
         // 🔥 側邊欄的訪客封印狀態（AI 諮詢師/行事曆/儀表板/設定變半透明、登出變登入）
-        // 現在統一交給 shared-sidebar.js 的 applySidebarGuestState() 集中處理，
-        // 確保訪客不論停在哪個開放頁面（overview / interview / interview_arena）
-        // 看到的側邊欄狀態都一致，這裡只需要處理本頁自己的個人化內容
+        // 現在統一交給 auth-guard.js 的 window.applyGuestLockUI() 集中處理（依
+        // data-requires-auth="true" 屬性掃描整份文件），確保訪客不論停在哪個開放頁面
+        // （overview / interview）看到的鎖定狀態都一致，這裡只需要處理本頁自己的個人化內容
         window.onload = async () => {
             // 視差滾動是純視覺效果，訪客／登入者都套用
             initHeroParallax();
